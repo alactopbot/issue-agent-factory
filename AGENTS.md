@@ -23,5 +23,4 @@ product repository.
 
 ## Development
 
-Use patches for file changes and preserve unrelated user work. Run `bash tests/run.sh` before handing off changes. When a
-skill changes, update and execute `evals/evals.json` as well.
+Use patches for file changes and preserve unrelated user work. Run `bash tests/run.sh` before handing off changes.

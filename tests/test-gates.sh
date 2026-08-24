@@ -22,6 +22,13 @@ write_package true
 green_output="$(cd "$fixture" && ./.factory/scripts/gates.sh full)"
 printf '%s' "$green_output" | grep -q 'status=GREEN'
 
+sed -i.bak -e 's/default: full/default: fast/' "$fixture/docs/factory/CHARTER.md"
+rm -f "$fixture/docs/factory/CHARTER.md.bak"
+default_output="$(cd "$fixture" && ./.factory/scripts/gates.sh)"
+printf '%s' "$default_output" | grep -q 'level=fast status=GREEN'
+sed -i.bak -e 's/default: fast/default: full/' "$fixture/docs/factory/CHARTER.md"
+rm -f "$fixture/docs/factory/CHARTER.md.bak"
+
 set +e
 invalid_output="$(cd "$fixture" && ./.factory/scripts/gates.sh typo 2>&1)"; invalid_status=$?
 set -e

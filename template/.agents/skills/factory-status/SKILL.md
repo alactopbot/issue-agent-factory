@@ -7,7 +7,7 @@ description: Produce a read-only Factory control-room report from live GitHub Is
 
 Use GitHub live state as the source of truth. Do not modify labels, comments, branches, pull requests, Patterns, or files.
 
-Report in the project's workflow language, in this order:
+Report in the repository and Issues' established language, in this order:
 
 1. Draft Specs awaiting human feedback or Ready;
 2. verified pull requests awaiting human merge;
@@ -17,4 +17,4 @@ Report in the project's workflow language, in this order:
 6. counts by Factory state, default-branch Gate health, and the highest-value next action.
 
 Include links and the evidence behind each stalled classification. When data is missing, say that the state cannot be
-determined; absence of a comment, Check, or recent commit is not evidence of success.
+determined; absence of a verification comment, configured project Check, or recent commit is not evidence of success.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Atomically claim one Issue with a readable deterministic remote branch.
+# Atomically claim one Issue with a stable deterministic remote branch.
 # The first non-forced push wins; a competing push from the same base diverges
 # and is rejected by Git. Labels remain visible state, not the lock.
 
@@ -7,26 +7,12 @@ set -euo pipefail
 
 ISSUE="${1:-}"
 RUN_ID="${2:-}"
-ISSUE_TITLE="${3:-}"
-BASE_REF="${4:-}"
+BASE_REF="${3:-}"
 
-if ! [[ "$ISSUE" =~ ^[1-9][0-9]*$ ]] || [ -z "$RUN_ID" ] || [ -z "$ISSUE_TITLE" ]; then
-  echo "usage: $0 <issue-number> <run-id> <exact-issue-title> [base-ref]" >&2
+if ! [[ "$ISSUE" =~ ^[1-9][0-9]*$ ]] || [ -z "$RUN_ID" ]; then
+  echo "usage: $0 <issue-number> <run-id> [base-ref]" >&2
   exit 2
 fi
-
-command -v node >/dev/null 2>&1 || {
-  echo "FACTORY_CLAIM: status=MISCONFIGURED reason=node-unavailable" >&2
-  exit 2
-}
-
-SLUG="$(node -e '
-const normalized = process.argv[1].normalize("NFKC").toLowerCase();
-const slug = normalized
-  .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
-  .replace(/^-+|-+$/g, "");
-process.stdout.write([...slug].slice(0, 48).join("").replace(/-+$/g, "") || "work");
-' "$ISSUE_TITLE")"
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "FACTORY_CLAIM: status=MISCONFIGURED reason=not-a-git-repository" >&2
@@ -45,8 +31,11 @@ git remote get-url origin >/dev/null 2>&1 || {
 }
 
 git fetch --quiet origin
-BRANCH="issue/$ISSUE-$SLUG"
-EXISTING_BRANCHES="$(git for-each-ref --format='%(refname:strip=3)' "refs/remotes/origin/issue/$ISSUE-*")"
+BRANCH="issue/$ISSUE"
+# Recognize both the stable name and legacy title-suffixed names so an updated
+# installation never creates a second claim for work already in progress.
+EXISTING_BRANCHES="$(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/issue/ | \
+  awk -v exact="$BRANCH" 'index($0, exact "-") == 1 || $0 == exact')"
 existing_count="$(printf '%s\n' "$EXISTING_BRANCHES" | awk 'NF { count += 1 } END { print count + 0 }')"
 if [ "$existing_count" -gt 1 ]; then
   echo "FACTORY_CLAIM: status=MISCONFIGURED reason=multiple-issue-branches issue=$ISSUE" >&2

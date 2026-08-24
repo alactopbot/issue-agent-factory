@@ -9,5 +9,4 @@ Git 内实时队列；一个完整需求一个 Issue/分支/PR；人工合并始
 bash tests/run.sh
 ```
 
-修改 skill 时同时更新 `evals/evals.json`，并按 `skill-creator` 流程运行带 skill 与基线评测。修改 GitHub
-协议时必须增加失败路径测试，尤其覆盖分页、可编辑评论、Spec 漂移、权限和陈旧 SHA。
+修改 GitHub 协议时必须增加失败路径测试，尤其覆盖分页、可编辑评论、Spec 漂移、权限和陈旧 SHA。

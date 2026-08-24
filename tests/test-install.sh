@@ -11,20 +11,24 @@ for path in \
   AGENTS.md \
   .agents/skills/factory-spec/SKILL.md \
   .agents/skills/factory-implement/SKILL.md \
-  .factory/project.json \
   .factory/pattern.schema.json \
   .factory/scripts/claim.sh \
   .factory/scripts/gates.sh \
-  .factory/scripts/validate-pr-gates.mjs \
+  .factory/scripts/validate-pr-state.mjs \
   .factory/hooks/block-merge.sh \
   .codex/hooks.json \
-  .github/workflows/factory-gates.yml \
   docs/factory/CONTRACT.md \
   docs/requirements/README.md; do
   [ -e "$fixture/$path" ] || { echo "missing installed file: $path" >&2; exit 1; }
 done
 
 [ -x "$fixture/.factory/scripts/claim.sh" ]
+[ -x "$fixture/.factory/scripts/validate-pr-state.mjs" ]
+[ ! -e "$fixture/.github/workflows" ]
+[ ! -e "$fixture/.factory/scripts/ci-setup.sh" ]
+[ ! -e "$fixture/.factory/scripts/validate-pr-gates.mjs" ]
+[ ! -e "$fixture/.factory/project.json" ]
+[ ! -e "$fixture/.factory/project.schema.json" ]
 
 second_run="$("$ROOT/install.sh" "$fixture")"
 printf '%s' "$second_run" | grep -q 'created: 0'

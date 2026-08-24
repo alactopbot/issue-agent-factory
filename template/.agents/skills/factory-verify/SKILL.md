@@ -10,7 +10,7 @@ implementer's explanation, and reject when the available evidence cannot support
 
 ## Inputs
 
-Read the contract, charter, project policy, complete Issue and trusted handoff, unique linked pull request, default-branch
+Read `AGENTS.md`, the contract, charter, complete Issue and trusted handoff, unique linked pull request, default-branch
 base, full diff, Checks, and the applicable authority:
 
 - ordinary path: approved `design.md` plus trusted Ready history;
@@ -26,19 +26,28 @@ Confirm the head SHA before running checks.
    Factory governance change.
 4. Confirm behavior evidence fails without the implementation and passes with it. Use
    `./.factory/scripts/prove-test.sh` when applicable from a clean committed checkout.
-5. Run the required Gate level independently. Missing, skipped, red, or misconfigured required checks reject the PR.
+5. Select and run the required Gate independently: an explicit Pattern uses its exact configured level; Factory
+   governance changes use `deep`; a change containing only `docs/**` and `README.md` files may use `fast`; every other
+   ordinary requirement uses at least the charter default. Record the level actually run. Missing, skipped, red, or
+   misconfigured required checks reject the PR.
 6. Check that the pull request states the product result, material risk, evidence, and remaining human merge decision.
 
 ## Verdict
 
-List blocking findings with reproduction evidence before the summary. On rejection, add `factory:rejected` and remove any
-stale verified label. On acceptance, publish exactly one trusted comment bound to the current full SHA:
+List blocking findings with reproduction evidence before the summary. Before publishing a new verdict, remove any existing
+`factory:verified` label so stale acceptance cannot survive a new head or verdict. On rejection, add `factory:rejected`.
+On acceptance, first publish exactly one trusted comment bound to the current full SHA and the Gate result actually run:
 
 ```text
 <!-- factory-verification -->
 requirement: REQ-<three-digit Issue number>
 decision: accepted
 verified_sha: <current full commit SHA>
+gate_level: <level actually run: fast | full | deep>
+gate_status: GREEN
 ```
 
-Add `factory:verified` and remove `factory:rejected`. Do not merge, approve the product, or convert a Draft plan to Ready.
+Then remove `factory:rejected`, add `factory:verified`, and run
+`node .factory/scripts/validate-pr-state.mjs --pr <pull-request-number>`. A non-green or misconfigured state result
+revokes acceptance: remove `factory:verified`, add `factory:rejected`, publish the blocking evidence, and stop. Do not
+merge, approve the product, or convert a Draft plan to Ready.

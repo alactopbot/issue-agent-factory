@@ -15,7 +15,6 @@ gh auth status >/dev/null 2>&1 || { echo "error: gh is not authenticated" >&2; e
 
 labels=(
   "factory:ready-to-spec|FBCA04|Needs one unified product and technical spec"
-  "factory:plan-review|FBCA04|Draft PR waiting for comments or Ready for review"
   "factory:wait-to-implement|C5DEF5|Waiting for Draft PR feedback or Ready decision"
   "factory:ready-to-implement|0E8A16|Approved spec or explicitly enabled pattern; implementation may resume"
   "factory:needs-info|D93F0B|Blocked on one decision that changes the result"

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { paginate, readyRunForTransition, validateGateContext } from "../template/.factory/scripts/validate-pr-gates.mjs";
+import {
+  paginate,
+  selectGateLevel,
+  validatePrState,
+} from "../template/.factory/scripts/validate-pr-state.mjs";
 
 const specSha = "1".repeat(40);
 const headSha = "2".repeat(40);
@@ -27,8 +31,8 @@ function transition(event = "ready_for_review", overrides = {}) {
   };
 }
 
-function verification(sha = headSha, decision = "accepted") {
-  return comment(`<!-- factory-verification -->\nrequirement: REQ-007\ndecision: ${decision}\nverified_sha: ${sha}`);
+function verification(sha = headSha, decision = "accepted", gateLevel = "full", gateStatus = "GREEN") {
+  return comment(`<!-- factory-verification -->\nrequirement: REQ-007\ndecision: ${decision}\nverified_sha: ${sha}\ngate_level: ${gateLevel}\ngate_status: ${gateStatus}`);
 }
 
 function reviewedContext() {
@@ -39,7 +43,7 @@ function reviewedContext() {
       isDraft: false,
       headSha,
       labels: ["factory:verified"],
-      changedFiles: ["src/feature.js", "docs/requirements/REQ-007-example/design.md", "docs/requirements/REQ-007-example/delivery.md"],
+      changedFiles: ["src/feature.js", "docs/requirements/REQ-007-example/design.md"],
     },
     issue: { number: 7, state: "OPEN", labels: [] },
     issueComments: [comment("<!-- factory-handoff -->\nrequirement: REQ-007\npattern: none\ndone_when: the complete result works")],
@@ -49,6 +53,7 @@ function reviewedContext() {
     comparisons: { [specSha]: { ancestorOfHead: true, changedFiles: ["src/feature.js"] } },
     pattern: null,
     hasReviewedSpec: true,
+    defaultGateLevel: "full",
   };
 }
 
@@ -56,7 +61,7 @@ function patternContext() {
   const context = reviewedContext();
   context.issue.labels = ["factory:pattern:feature-family"];
   context.issueComments = [comment("<!-- factory-handoff -->\nrequirement: REQ-007\npattern: feature-family\ndone_when: the complete result works")];
-  context.pr.changedFiles = ["src/feature.js", "docs/requirements/REQ-007-example/delivery.md"];
+  context.pr.changedFiles = ["src/feature.js"];
   context.pr.isDraft = false;
   context.specTransitions = [];
   context.comparisons = {};
@@ -78,24 +83,47 @@ function patternContext() {
 }
 
 test("reviewed Spec Ready state and current independent verification pass", () => {
-  assert.deepEqual(validateGateContext(reviewedContext()), { ok: true, errors: [] });
+  assert.deepEqual(validatePrState(reviewedContext()), { ok: true, errors: [] });
+  assert.equal(selectGateLevel(reviewedContext()), "full");
 });
 
-test("Actions run head binds Ready when timeline commit_id is absent", () => {
+test("verification selects a configured, sufficiently strict gate level", () => {
+  const docs = reviewedContext();
+  docs.pr.changedFiles = ["docs/guide.md", "docs/requirements/REQ-007-example/design.md"];
+  docs.prComments = [verification(headSha, "accepted", "fast")];
+  assert.equal(validatePrState(docs).ok, true);
+  assert.equal(selectGateLevel(docs), "fast");
+
+  const governance = reviewedContext();
+  governance.pr.changedFiles.push(".factory/gates.conf");
+  governance.prComments = [verification(headSha, "accepted", "full")];
+  assert.ok(validatePrState(governance).errors.includes("verification:gate-level-below-required:full:deep"));
+
+  const pattern = patternContext();
+  pattern.prComments = [verification(headSha, "accepted", "deep")];
+  assert.ok(validatePrState(pattern).errors.includes("verification:pattern-gate-level-mismatch:deep:full"));
+});
+
+test("missing or invalid gate configuration fails closed", () => {
+  const missingMarker = reviewedContext();
+  missingMarker.prComments = [comment(`<!-- factory-verification -->\nrequirement: REQ-007\ndecision: accepted\nverified_sha: ${headSha}`)];
+  assert.ok(validatePrState(missingMarker).errors.includes("verification:gate-level-invalid"));
+
+  const invalidCharter = reviewedContext();
+  invalidCharter.defaultGateLevel = "typo";
+  assert.ok(validatePrState(invalidCharter).errors.includes("gate-level:charter-default-invalid"));
+});
+
+test("Ready without an exact commit SHA fails closed", () => {
   const context = reviewedContext();
   context.specTransitions[0].commitId = null;
-  context.specTransitions[0].runHeadSha = specSha;
-  context.specTransitions[0].runUrl = "https://github.com/example/project/actions/runs/1";
-  assert.equal(validateGateContext(context).ok, true);
+  assert.ok(validatePrState(context).errors.includes("spec-ready:invalid-sha"));
 });
 
 test("Ready approval cannot move past Spec drift", () => {
   const context = reviewedContext();
-  context.specTransitions[0].commitId = null;
-  context.specTransitions[0].runHeadSha = specSha;
-  context.specTransitions[0].runUrl = "https://github.com/example/project/actions/runs/1";
   context.comparisons[specSha].changedFiles = ["docs/requirements/REQ-007-example/design.md"];
-  const errors = validateGateContext(context).errors;
+  const errors = validatePrState(context).errors;
   assert.ok(errors.includes("spec-ready:spec-drift"));
 });
 
@@ -103,43 +131,47 @@ test("Draft and Convert to draft revoke approval", () => {
   const missing = reviewedContext();
   missing.pr.isDraft = true;
   missing.specTransitions = [];
-  assert.ok(validateGateContext(missing).errors.includes("spec-ready:missing"));
+  assert.ok(validatePrState(missing).errors.includes("spec-ready:missing"));
 
   const converted = reviewedContext();
   converted.pr.isDraft = true;
   converted.specTransitions.push(transition("convert_to_draft", { createdAt: "2026-08-24T00:01:00Z" }));
-  assert.ok(validateGateContext(converted).errors.includes("spec-ready:pr-is-draft"));
+  assert.ok(validatePrState(converted).errors.includes("spec-ready:pr-is-draft"));
 });
 
 test("write collaborator is trusted but untrusted actor is rejected", () => {
   const collaborator = reviewedContext();
   collaborator.specTransitions[0] = transition("ready_for_review", { trustedActor: true, authorAssociation: "NONE" });
-  assert.equal(validateGateContext(collaborator).ok, true);
+  assert.equal(validatePrState(collaborator).ok, true);
 
   const outsider = reviewedContext();
   outsider.specTransitions[0] = transition("ready_for_review", { trustedActor: false, authorAssociation: "NONE" });
-  assert.ok(validateGateContext(outsider).errors.includes("spec-ready:untrusted-actor"));
+  assert.ok(validatePrState(outsider).errors.includes("spec-ready:untrusted-actor"));
 });
 
 test("unique PR and current verification fail closed", () => {
   const secondPr = reviewedContext();
   secondPr.openLinkedPrs.push(9);
-  assert.ok(validateGateContext(secondPr).errors.includes("pr:not-unique-open"));
+  assert.ok(validatePrState(secondPr).errors.includes("pr:not-unique-open"));
 
   const stale = reviewedContext();
   stale.prComments[0] = verification(specSha);
-  assert.ok(validateGateContext(stale).errors.includes("verification:stale-sha"));
+  assert.ok(validatePrState(stale).errors.includes("verification:stale-sha"));
 
   const rejected = reviewedContext();
   rejected.pr.labels.push("factory:rejected");
-  assert.ok(validateGateContext(rejected).errors.includes("verification:rejected-label-present"));
+  assert.ok(validatePrState(rejected).errors.includes("verification:rejected-label-present"));
+
+  const redGate = reviewedContext();
+  redGate.prComments[0] = verification(headSha, "accepted", "full", "RED");
+  assert.ok(validatePrState(redGate).errors.includes("verification:gate-not-green"));
 });
 
 test("missing reviewed Spec and closed issue fail closed", () => {
   const context = reviewedContext();
   context.issue.state = "CLOSED";
   context.hasReviewedSpec = false;
-  const errors = validateGateContext(context).errors;
+  const errors = validatePrState(context).errors;
   assert.ok(errors.includes("issue:not-open"));
   assert.ok(errors.includes("spec:design-missing"));
 });
@@ -148,34 +180,34 @@ test("an enabled Pattern cannot authorize Factory governance changes", () => {
   const context = patternContext();
   context.pr.changedFiles.push(".agents/skills/factory-spec/SKILL.md");
   context.pattern.scope.allowedPaths.push(".agents/**");
-  assert.ok(validateGateContext(context).errors.includes("governance:pattern-cannot-authorize:.agents/skills/factory-spec/SKILL.md"));
+  assert.ok(validatePrState(context).errors.includes("governance:pattern-cannot-authorize:.agents/skills/factory-spec/SKILL.md"));
 });
 
 test("an explicitly enabled Pattern skips Spec Ready but keeps scope and verification", () => {
   const context = patternContext();
-  assert.equal(validateGateContext(context).ok, true);
+  assert.equal(validatePrState(context).ok, true);
 
   context.pr.isDraft = true;
-  assert.ok(validateGateContext(context).errors.includes("pattern:pr-is-draft"));
+  assert.ok(validatePrState(context).errors.includes("pattern:pr-is-draft"));
   context.pr.isDraft = false;
 
   context.pr.changedFiles.push("package.json");
-  assert.ok(validateGateContext(context).errors.includes("pattern:not-allowed:package.json"));
+  assert.ok(validatePrState(context).errors.includes("pattern:not-allowed:package.json"));
   context.pr.changedFiles.pop();
 
   context.prComments = [];
-  assert.ok(validateGateContext(context).errors.includes("verification:missing"));
+  assert.ok(validatePrState(context).errors.includes("verification:missing"));
 });
 
 test("a disabled or unlabeled Pattern cannot bypass Spec Ready", () => {
   const disabled = patternContext();
   disabled.pattern.enabled = false;
-  assert.ok(validateGateContext(disabled).errors.includes("pattern:missing-disabled-or-invalid"));
+  assert.ok(validatePrState(disabled).errors.includes("pattern:missing-disabled-or-invalid"));
 
   const unlabeled = patternContext();
   unlabeled.issue.labels = [];
-  assert.ok(validateGateContext(unlabeled).errors.includes("pattern:configuration-without-activation-label"));
-  assert.ok(validateGateContext(unlabeled).errors.includes("spec-ready:missing"));
+  assert.ok(validatePrState(unlabeled).errors.includes("pattern:configuration-without-activation-label"));
+  assert.ok(validatePrState(unlabeled).errors.includes("spec-ready:missing"));
 });
 
 test("an untrusted marker cannot shadow the latest trusted handoff", () => {
@@ -184,7 +216,7 @@ test("an untrusted marker cannot shadow the latest trusted handoff", () => {
     "<!-- factory-handoff -->\nrequirement: REQ-999\npattern: none",
     { authorAssociation: "NONE", createdAt: "2026-08-24T00:05:00Z" },
   ));
-  assert.equal(validateGateContext(context).ok, true);
+  assert.equal(validatePrState(context).ok, true);
 });
 
 test("pagination reads item 101", async () => {
@@ -204,15 +236,4 @@ test("pagination reads item 101", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
-});
-
-test("Ready binds the first matching Factory Gates run after transition", () => {
-  const event = { created_at: "2026-08-24T00:00:00Z" };
-  const runs = [
-    { name: "Factory Gates", event: "pull_request", created_at: "2026-08-23T23:59:59Z", head_sha: "old", pull_requests: [{ number: 8 }] },
-    { name: "Other", event: "pull_request", created_at: "2026-08-24T00:00:01Z", head_sha: "other", pull_requests: [{ number: 8 }] },
-    { name: "Factory Gates", event: "pull_request", created_at: "2026-08-24T00:00:02Z", head_sha: specSha, pull_requests: [{ number: 8 }] },
-    { name: "Factory Gates", event: "pull_request", created_at: "2026-08-24T00:00:03Z", head_sha: headSha, pull_requests: [{ number: 8 }] },
-  ];
-  assert.equal(readyRunForTransition(event, runs, 8).head_sha, specSha);
 });

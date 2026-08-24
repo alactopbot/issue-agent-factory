@@ -6,7 +6,7 @@
 #
 # Usage:
 #   ./.factory/scripts/gates.sh fast    # types + lint            (~seconds, run constantly)
-#   ./.factory/scripts/gates.sh full    # + tests + build         (default, run before any PR)
+#   ./.factory/scripts/gates.sh full    # + tests + build
 #   ./.factory/scripts/gates.sh deep    # + audit + complexity    (run on load-bearing changes)
 #
 # Exit codes:  0 = all required gates green   1 = at least one gate red
@@ -19,9 +19,12 @@
 
 set -uo pipefail
 
-LEVEL="${1:-full}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT" || exit 2
+LEVEL="${1:-}"
+if [ -z "$LEVEL" ]; then
+  LEVEL="$(sed -nE 's/^[[:space:]]*default:[[:space:]]*(fast|full|deep)[[:space:]]*$/\1/p' docs/factory/CHARTER.md 2>/dev/null)"
+fi
 
 case "$LEVEL" in
   fast|full|deep) ;;

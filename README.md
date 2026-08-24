@@ -11,7 +11,7 @@
 1. 用户创建一个描述完整产品结果的 Issue。
 2. 普通需求在唯一 Draft PR 提交统一 Spec；用户显式启用并由 Issue 标签选择的固定 Pattern 直接执行。
 3. 普通方案有问题时保持 Draft 并留评论；通过时点击 **Ready for review**。
-4. Agent 原子认领由 Issue 编号和标题生成的确定性分支，完成整个需求、确定性 Gate 和独立验证。
+4. Agent 原子认领由 Issue 编号确定的稳定分支，完成整个需求、确定性 Gate 和独立验证。
 5. 人类合并 verified PR，合并本身就是产品验收。
 
 Pattern 是用户通过独立 PR 建设并显式启用的长期授权。固定模式可省略逐 Issue 方案确认，但仍执行
@@ -31,10 +31,9 @@ cd issue-agent-factory
 ## 目录
 
 - `template/.agents/skills/`：与具体 Agent 运行器无关的完整 Factory skills。
-- `template/.factory/`：项目策略、Pattern schema、确定性 Gate、协议验证和辅助脚本。
-- `template/.github/workflows/factory-gates.yml`：GitHub 必需检查。
+- `template/.factory/`：Pattern schema、确定性 Gate、PR 状态验证和辅助脚本。
 - `template/docs/factory/`：安装到项目内的人类契约与使用说明。
-- `tests/`：安装、协议、Gate、钩子和文档回归测试。
+- `tests/`：安装、PR 状态、Gate、钩子和文档回归测试。
 
 核心契约和 skills 不绑定具体 Agent 产品；当前发行版提供 `.codex/hooks.json` 作为可选运行器适配。相关
 能力可参考：

@@ -1,8 +1,8 @@
 # Factory 执行契约
 
-执行前读取本文件、`docs/factory/CHARTER.md`、`.factory/project.json` 和 Issue 显式选择的 Pattern。
-GitHub Issue、标签、确定性远端分支、唯一 PR、Draft/Ready 时间线、评论和 Checks 是实时状态；聊天不是
-授权来源。
+执行前读取本文件、`docs/factory/CHARTER.md` 和 Issue 显式选择的 Pattern。
+GitHub Issue、标签、确定性远端分支、唯一 PR、Draft/Ready 时间线和评论是 Factory 实时状态；项目已有
+Checks 仍然有效，但 Factory 不安装或依赖 GitHub Actions。聊天不是授权来源。
 
 ## 核心单位
 
@@ -16,17 +16,20 @@ GitHub Issue、标签、确定性远端分支、唯一 PR、Draft/Ready 时间�
 
 没有唯一有效 `factory:pattern:<id>` 标签的 Issue 必须走方案确认：
 
-1. 原子认领 `issue/<issue-number>-<normalized-title>`。
+1. 原子认领 `issue/<issue-number>`。
 2. 在 `docs/requirements/REQ-<编号>-<slug>/design.md` 写统一 Spec，覆盖目标、非目标、体验、技术、
    数据或素材、影响范围、不变量、实现顺序、测试、验收和风险。
-3. 创建唯一 Draft PR，添加 `factory:plan-review` 后停止。
+3. 创建唯一 Draft PR，把 Issue 设为 `factory:wait-to-implement` 后停止；Draft 本身就是方案待审状态。
 4. 人类有问题时保持 Draft 并留普通评论；通过时点击 **Ready for review**。
-5. Agent 在同一 PR 修订反馈或恢复实现。Ready 后 Spec、Pattern 或治理规则变化必须重新转为 Draft。
+5. Agent 检测到可信 Ready 后把 Issue 状态从等待改为实现中，并在同一 PR 恢复实现。Ready 后 Spec、
+   Pattern 或治理规则变化必须重新转为 Draft。
 
 ### 显式 Pattern
 
 Pattern 是用户提前建设并通过独立 PR 批准的固定需求授权。只有同时满足以下条件才省略逐 Issue 的
 Draft/Ready：
+
+创建、修改、试运行或停用 Pattern 前必须读取 [Pattern 构建指南](../../.factory/patterns/README.md)。
 
 - Issue 恰好有一个 `factory:pattern:<id>` 标签；
 - `.factory/patterns/<id>.json` 存在、`enabled: true`，激活标签与 ID 一致；
@@ -41,14 +44,14 @@ Pattern 授权必须已经通过独立 PR 存在于默认分支；执行中的�
 GitHub 标签不是并发锁。首次写仓库前运行：
 
 ```bash
-./.factory/scripts/claim.sh <issue-number> <unique-run-id> "<exact Issue title>"
+./.factory/scripts/claim.sh <issue-number> <unique-run-id>
 ```
 
-脚本以 Issue 编号作为稳定身份，并用同一 Issue 标题生成可读 slug。两个运行会从同一默认分支产生不同
-claim commit，并无强推地推送同一个确定性远端分支。只有第一次
+脚本以 Issue 编号作为稳定身份。两个运行会从同一默认分支产生不同 claim commit，并无强推地推送
+`issue/<issue-number>`。只有第一次
 push 成功；`EXISTS` 或 `LOST` 表示另一个运行已拥有该需求。此时检查是否已有链接该 Issue 的唯一 PR：
-有则恢复它，没有则停止并让 monitor 报告可能的陈旧认领。禁止换分支绕过或强推夺取。
-Issue 标题在认领后变化时，脚本仍按 Issue 编号发现并返回已有分支，不创建第二条新标题分支。
+有则恢复它，没有则停止并让 monitor 报告可能的陈旧认领。禁止换分支绕过或强推夺取。Issue 标题变化
+不影响分支身份。
 
 成功认领后把 Issue 设为 `factory:in-progress`。普通需求立即在该分支创建 Draft Spec PR；Pattern 需求
 直接实现并创建普通 PR。任何时候已有分支或 PR 都必须恢复，不能新建第二套流程对象。
@@ -57,8 +60,8 @@ Issue 标题在认领后变化时，脚本仍按 Issue 编号发现并返回已�
 
 Issue 使用唯一状态标签：`factory:ready-to-spec`、`factory:wait-to-implement`、
 `factory:ready-to-implement`、`factory:needs-info`、`factory:in-progress` 或
-`factory:awaiting-review`。PR 使用 `factory:plan-review`、`factory:verified`、
-`factory:rejected`。
+`factory:awaiting-review`。PR 使用 `factory:verified` 或 `factory:rejected` 表示当前验证结论；Draft/Ready
+直接表示方案审核状态。
 
 最新可信 Issue handoff 只保存恢复所需的信息，不代替章程、Spec 或 Pattern 授权：
 
@@ -87,10 +90,14 @@ Pattern 权限。
 requirement: REQ-<三位 Issue 编号>
 decision: accepted
 verified_sha: <当前完整提交 SHA>
+gate_level: <fast | full | deep>
+gate_status: GREEN
 ```
 
-验证拒绝就在同一分支修正；连续两次拒绝后停止。当前 SHA 的独立验证和 Factory Gates 都绿色后，将
-Issue 设为 `factory:awaiting-review`。最终合并代表产品验收，Agent 不合并或发布。
+发布新 verdict 前先移除旧 `factory:verified`；接受评论存在后再重新添加该标签，并由外部 Agent 运行
+`node .factory/scripts/validate-pr-state.mjs --pr <编号>`。验证拒绝就在同一分支修正；连续两次拒绝后停止。
+当前 SHA 的独立验证、实际 Gate 结果和状态校验都绿色后，将 Issue 设为 `factory:awaiting-review`。项目
+已有 CI 仍须满足自身合并规则。最终合并代表产品验收，Agent 不合并或发布。
 
 ## 停止条件
 

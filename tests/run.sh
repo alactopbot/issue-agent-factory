@@ -12,6 +12,6 @@ for test_script in tests/test-*.sh; do
   bash "$test_script"
 done
 
-printf '\n==> node protocol tests\n'
+printf '\n==> node PR state tests\n'
 node --test tests/*.test.mjs
 printf '\nAll Issue Agent Factory tests passed.\n'

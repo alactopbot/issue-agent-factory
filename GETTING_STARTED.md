@@ -12,10 +12,8 @@
 
 必须先修改以下文件，Factory 才会工作：
 
-- `.factory/project.json`：项目名、项目类型、工作语言和产品语言。
 - `docs/factory/CHARTER.md`：承重路径、允许自动处理的工作、需要方案的工作和停止条件。
 - `.factory/gates.conf`：fast/full/deep 三档必需检查。
-- `.factory/scripts/ci-setup.sh`：如果默认依赖安装不适合项目，在这里替换。
 - `AGENTS.md`：在“项目命令”中写入安装、测试、构建和本地运行命令。
 
 配置完成后把 `CHARTER_STATUS` 改为 `ready`。
@@ -25,9 +23,11 @@
 ```bash
 ./.factory/scripts/doctor.sh
 ./.factory/scripts/gates.sh full
+./.factory/scripts/gates.sh deep  # 项目或 Pattern 会使用 deep 时也必须校准
 ```
 
-Gate 必须真正执行；必需项被跳过会返回 `MISCONFIGURED`，而不是绿色。
+Gate 必须真正执行；必需项被跳过会返回 `MISCONFIGURED`，而不是绿色。独立验证者运行并在评论中绑定
+实际等级与结果：普通需求不得低于 CHARTER 默认等级，Factory 治理改动强制 deep，Pattern 必须与其配置一致。
 
 ## 4. 配置 GitHub
 
@@ -37,7 +37,7 @@ Gate 必须真正执行；必需项被跳过会返回 `MISCONFIGURED`，而不�
 ```
 
 将安装内容提交并推送。为默认分支启用 ruleset 或 branch protection：要求 PR、禁止强推、禁止 Agent
-绕过，并将 `Factory Gates / factory-gates` 设为必需检查。
+绕过。Factory 本身不安装 GitHub Actions；项目已有 CI 可以继续作为项目自己的必需检查。
 
 ## 5. 首次校准
 
@@ -59,7 +59,14 @@ Pattern 合并后，由用户创建配置中同名的激活标签，例如：
 gh label create "factory:pattern:<id>" --description "Use enabled Pattern <id>" --color "5319E7"
 ```
 
+完整的成熟度判断、证据提炼、glob 限制、确定性约束、配置示例、人工审核、试运行、版本和停用流程见
+[Pattern 构建指南](template/.factory/patterns/README.md)。
+
 ## 6. 自动化
 
 在所选 Agent 运行器中为项目建立 scheduled task，提示词使用 [AUTOMATIONS.md](AUTOMATIONS.md) 的模板。
-定时任务只负责轮询和推进；GitHub Issue/PR/Checks 始终是可恢复状态，聊天不是批准来源。
+定时任务只负责轮询和推进；GitHub Issue、PR、标签和评论始终是可恢复状态，聊天不是批准来源。
+
+定时任务必须运行在独立 worktree，具有工作区写权限和 GitHub 网络访问，并使用一个已认证、可读取
+仓库、管理 Issue/PR 标签、创建普通分支与 PR、但不能绕过默认分支保护的身份。启用定时执行前先用
+同一身份手工完整跑通一个普通 Issue。

@@ -22,8 +22,8 @@
 
 ## Issue Agent Factory
 
-Before requirement work, read `docs/factory/CONTRACT.md`, `docs/factory/CHARTER.md`, and `.factory/project.json`, then
-use the applicable workflow under `.agents/skills/`.
+Before requirement work, read `docs/factory/CONTRACT.md` and `docs/factory/CHARTER.md`, then use the applicable workflow
+under `.agents/skills/`.
 
 GitHub is the live state; chat history is not authorization. One complete requirement uses one Issue, one deterministic
 branch, and one pull request. Ordinary work requires a reviewed Spec. Only a Pattern that users have enabled and selected

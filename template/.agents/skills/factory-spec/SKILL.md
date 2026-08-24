@@ -10,14 +10,14 @@ complete requirement and uses one Draft pull request as the review surface.
 
 ## Preconditions and recovery
 
-Read the contract, charter, project policy, complete Issue, latest trusted handoff, current labels, deterministic branch,
+Read `AGENTS.md`, the contract, charter, complete Issue, latest trusted handoff, current labels, deterministic branch,
 linked pull requests, review timeline, and comments.
 
 - If the deterministic branch or the unique linked pull request exists, recover it.
 - Otherwise, before the first repository write, run:
 
   ```bash
-  ./.factory/scripts/claim.sh <issue-number> <unique-run-id> "<exact Issue title>"
+  ./.factory/scripts/claim.sh <issue-number> <unique-run-id>
   ```
 
   Continue only on `CLAIMED`. On `EXISTS` or `LOST`, recover the winner or stop. Do not invent another branch name.
@@ -36,8 +36,8 @@ For an ordinary requirement, `design.md` is the complete plan authority used by 
 
 ## Review lifecycle
 
-Push the claimed branch and create the single linked Draft pull request with `Closes #<issue>`. Add
-`factory:plan-review`, set the Issue to `factory:wait-to-implement`, and stop.
+Push the claimed branch and create the single linked Draft pull request with `Closes #<issue>`. Set the Issue to
+`factory:wait-to-implement` and stop. The Draft state is the plan-review state; do not duplicate it with a PR label.
 
 - Feedback: keep the pull request Draft and revise the same `design.md` from ordinary review comments.
 - Approval: only a trusted human selecting **Ready for review** authorizes implementation.

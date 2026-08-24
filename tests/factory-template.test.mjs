@@ -14,9 +14,12 @@ async function filesUnder(relative) {
 
 test("installed workflow has one portable canonical layout", async () => {
   const files = await filesUnder("template/");
+  const text = (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
   assert.equal(files.filter((file) => file.endsWith("/AGENTS.md")).length, 1);
   assert.equal(files.filter((file) => /\/\.agents\/skills\/factory-[^/]+\/SKILL\.md$/.test(file)).length, 7);
   assert.equal(files.filter((file) => file.endsWith("/docs/factory/CONTRACT.md")).length, 1);
+  assert.equal(files.some((file) => /\/\.factory\/project(?:\.schema)?\.json$/.test(file)), false);
+  assert.doesNotMatch(text, /factory:plan-review|delivery\.md|validate-pr-gates/);
 });
 
 test("AGENTS and every Factory skill are complete, portable, and runtime-neutral", async () => {
@@ -29,8 +32,16 @@ test("AGENTS and every Factory skill are complete, portable, and runtime-neutral
     assert.doesNotMatch(skill, /Codex|Claude|OpenAI|Anthropic|\.claude/i);
   }
   assert.match(await read("template/.agents/skills/factory-spec/SKILL.md"), /Ready for review/);
-  assert.match(await read("template/.agents/skills/factory-implement/SKILL.md"), /fresh independent Agent context/);
-  assert.match(await read("template/.agents/skills/factory-implement/SKILL.md"), /issue-number.*exact Issue title/s);
+  const implement = await read("template/.agents/skills/factory-implement/SKILL.md");
+  const verify = await read("template/.agents/skills/factory-verify/SKILL.md");
+  assert.match(implement, /fresh independent Agent context/);
+  assert.match(implement, /claim\.sh <issue-number> <unique-run-id>/);
+  assert.doesNotMatch(implement, /factory:plan-review|exact Issue title/);
+  assert.match(verify, /remove any existing\s+`factory:verified` label/);
+  assert.match(verify, /gate_level: <level actually run: fast \| full \| deep>/);
+  assert.match(verify, /gate_status: GREEN/);
+  assert.match(verify, /governance changes use `deep`/);
+  assert.match(verify, /Pattern uses its exact configured level/);
 });
 
 test("framework has no project business residue or line-count policy", async () => {
@@ -54,10 +65,20 @@ test("Patterns have an explicit user-controlled activation contract", async () =
   const schema = await read("template/.factory/pattern.schema.json");
   const parsed = JSON.parse(schema);
   const triage = await read("template/.agents/skills/factory-triage/SKILL.md");
+  const guide = await read("template/.factory/patterns/README.md");
   assert.deepEqual(parsed.required, ["id", "version", "enabled", "activation", "scope", "execution"]);
+  assert.equal(parsed.properties.$schema.const, "../pattern.schema.json");
   assert.equal(parsed.properties.enabled.type, "boolean");
   assert.match(parsed.properties.activation.properties.issueLabel.pattern, /factory:pattern:/);
   assert.match(triage, /user-reviewed configuration is enabled on the default branch/);
+  assert.match(guide, /factory-tune/);
+  assert.match(guide, /不是代码模板、Issue 模板或自动/);
+  assert.match(guide, /不支持变量、捕获组、负向规则/);
+  assert.match(guide, /不能只靠 glob，必须\n由确定性 Gate 检查/);
+  assert.match(guide, /"enabled": false/);
+  assert.match(guide, /独立普通 PR/);
+  assert.match(guide, /递增 `version`/);
+  assert.match(guide, /gh label create "factory:pattern:<id>"/);
 });
 
 test("ordinary requirements use one complete human-readable Spec", async () => {
@@ -65,5 +86,22 @@ test("ordinary requirements use one complete human-readable Spec", async () => {
   assert.match(spec, /design\.md/);
   assert.match(spec, /design\.md` is the complete plan authority/);
   assert.match(await read("template/docs/requirements/README.md"), /design\.md/);
-  assert.match(await read("template/docs/requirements/README.md"), /delivery\.md/);
+  assert.doesNotMatch(await read("template/docs/requirements/README.md"), /delivery\.md/);
+});
+
+test("external agents validate PR state without an installed GitHub Actions workflow", async () => {
+  const files = await filesUnder("template/");
+  const validator = await read("template/.factory/scripts/validate-pr-state.mjs");
+  assert.equal(files.some((file) => file.includes("/.github/workflows/")), false);
+  assert.match(validator, /--pr <number>/);
+  assert.match(validator, /ghOutput\(\["auth", "token"\]\)/);
+  assert.doesNotMatch(validator, /GITHUB_EVENT_PATH|GITHUB_OUTPUT|actions\/runs/);
+  assert.match(validator, /verification:gate-level-below-required/);
+  assert.match(validator, /verification:gate-not-green/);
+});
+
+test("doctor checks labels with the current GitHub CLI surface", async () => {
+  const doctor = await read("template/.factory/scripts/doctor.sh");
+  assert.match(doctor, /gh label list --limit 1000 --json name/);
+  assert.doesNotMatch(doctor, /gh label view/);
 });

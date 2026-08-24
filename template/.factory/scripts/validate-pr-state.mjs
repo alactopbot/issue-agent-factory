@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 
+import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import process from "node:process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const trustedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const trustedPermissions = new Set(["admin", "maintain", "write"]);
 const governancePaths = [
   /^\.factory\/patterns\//,
-  /^\.factory\/project\.json$/,
   /^\.factory\/(?:gates\.conf|.*\.schema\.json|scripts\/|hooks\/)/,
   /^\.agents\/skills\//,
   /^\.codex\//,
-  /^\.github\/workflows\/factory-gates\.yml$/,
   /^AGENTS\.md$/,
   /^docs\/factory\/(?:CHARTER|CONTRACT)\.md$/,
 ];
@@ -20,6 +22,8 @@ const approvalBoundPaths = [
   ...governancePaths,
 ];
 const fieldLine = /^([a-z_]+):\s*(.+)$/;
+const gateLevels = ["fast", "full", "deep"];
+const gateRank = new Map(gateLevels.map((level, index) => [level, index]));
 
 export function parseMarker(body, marker) {
   const start = body.indexOf(`<!-- ${marker} -->`);
@@ -77,11 +81,6 @@ function matchesAny(patterns, path) {
   return patterns.some((pattern) => pattern.test(path));
 }
 
-function deliveryEvidencePath(issueNumber, path) {
-  const prefix = requirementId(issueNumber);
-  return new RegExp(`^docs/requirements/${prefix}-[^/]+/delivery\\.md$`).test(path);
-}
-
 function validPattern(pattern, issueLabels) {
   if (!pattern || typeof pattern !== "object") return false;
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pattern.id ?? "")) return false;
@@ -90,17 +89,37 @@ function validPattern(pattern, issueLabels) {
   if (!issueLabels.includes(pattern.activation.issueLabel)) return false;
   if (!Array.isArray(pattern.scope?.allowedPaths) || pattern.scope.allowedPaths.length === 0) return false;
   if (!Array.isArray(pattern.scope?.preserved) || pattern.scope.preserved.length === 0) return false;
+  if (!pattern.scope.allowedPaths.every((item) => typeof item === "string" && item.length > 0)) return false;
+  if (!pattern.scope.preserved.every((item) => typeof item === "string" && item.length > 0)) return false;
   return pattern.execution?.planReview === "none" &&
     ["fast", "full", "deep"].includes(pattern.execution?.gateLevel) &&
     pattern.execution?.independentVerification === "required" &&
     pattern.execution?.completion === "verified-pr";
 }
 
-export function validateGateContext(context) {
+function docsOnly(paths) {
+  return paths.length > 0 && paths.every((path) => path.startsWith("docs/") || /(^|\/)README\.md$/.test(path));
+}
+
+function requiredGateLevel(context, patternRun) {
+  if (patternRun) return context.pattern?.execution?.gateLevel;
+  if (context.pr.changedFiles.some((path) => matchesAny(governancePaths, path))) return "deep";
+  if (docsOnly(context.pr.changedFiles)) return "fast";
+  return context.defaultGateLevel;
+}
+
+export function selectGateLevel(context) {
+  const verification = latestMarker(context.prComments, "factory-verification", (_fields, item) => trusted(item));
+  const level = verification?.fields.gate_level;
+  if (!gateRank.has(level)) throw new Error("latest trusted verification has no valid gate_level");
+  return level;
+}
+
+export function validatePrState(context) {
   const errors = [];
   const {
     pr, issue, issueComments, prComments, specTransitions, openLinkedPrs,
-    comparisons, pattern, hasReviewedSpec,
+    comparisons, pattern, hasReviewedSpec, defaultGateLevel,
   } = context;
 
   if (pr.state !== "OPEN") errors.push("pr:not-open");
@@ -118,6 +137,7 @@ export function validateGateContext(context) {
   const patternLabels = (issue.labels ?? []).filter((label) => label.startsWith("factory:pattern:"));
   if (patternLabels.length > 1) errors.push("pattern:multiple-activation-labels");
   const patternRun = patternLabels.length === 1;
+  if (!gateRank.has(defaultGateLevel)) errors.push("gate-level:charter-default-invalid");
 
   if (patternRun) {
     if (!validPattern(pattern, issue.labels ?? [])) {
@@ -127,8 +147,7 @@ export function validateGateContext(context) {
       for (const path of pr.changedFiles) {
         if (matchesAny(governancePaths, path)) {
           errors.push(`governance:pattern-cannot-authorize:${path}`);
-        } else if (!deliveryEvidencePath(issue.number, path) &&
-                   !pattern.scope.allowedPaths.some((allowed) => pathMatches(allowed, path))) {
+        } else if (!pattern.scope.allowedPaths.some((allowed) => pathMatches(allowed, path))) {
           errors.push(`pattern:not-allowed:${path}`);
         }
       }
@@ -149,12 +168,12 @@ export function validateGateContext(context) {
       errors.push("spec-ready:pr-is-draft");
     } else if (!trusted(transition)) {
       errors.push("spec-ready:untrusted-actor");
-    } else if (!isFullSha(transition.commitId ?? transition.runHeadSha)) {
+    } else if (!isFullSha(transition.commitId)) {
       errors.push("spec-ready:invalid-sha");
-    } else if (!transition.url || (!transition.commitId && !transition.runUrl)) {
+    } else if (!transition.url) {
       errors.push("spec-ready:missing-source");
     } else {
-      const approvedSha = transition.commitId ?? transition.runHeadSha;
+      const approvedSha = transition.commitId;
       const comparison = comparisons[approvedSha];
       if (!comparison || !comparison.ancestorOfHead) {
         errors.push("spec-ready:sha-not-in-pr-history");
@@ -164,7 +183,6 @@ export function validateGateContext(context) {
     }
   }
 
-  if (pr.labels.includes("factory:plan-review")) errors.push("pr:plan-review-pending");
   if (pr.labels.includes("factory:rejected")) errors.push("verification:rejected-label-present");
   if (!pr.labels.includes("factory:verified")) errors.push("verification:label-missing");
 
@@ -177,6 +195,16 @@ export function validateGateContext(context) {
     if (!isFullSha(verification.fields.verified_sha)) errors.push("verification:invalid-sha");
     if (verification.fields.verified_sha !== pr.headSha) errors.push("verification:stale-sha");
     if (!verification.item.url) errors.push("verification:missing-source");
+    if (verification.fields.gate_status !== "GREEN") errors.push("verification:gate-not-green");
+    const actualGateLevel = verification.fields.gate_level;
+    const minimumGateLevel = requiredGateLevel(context, patternRun);
+    if (!gateRank.has(actualGateLevel)) {
+      errors.push("verification:gate-level-invalid");
+    } else if (patternRun && gateRank.has(minimumGateLevel) && actualGateLevel !== minimumGateLevel) {
+      errors.push(`verification:pattern-gate-level-mismatch:${actualGateLevel}:${minimumGateLevel}`);
+    } else if (!patternRun && gateRank.has(minimumGateLevel) && gateRank.get(actualGateLevel) < gateRank.get(minimumGateLevel)) {
+      errors.push(`verification:gate-level-below-required:${actualGateLevel}:${minimumGateLevel}`);
+    }
   }
 
   return { ok: errors.length === 0, errors };
@@ -206,19 +234,6 @@ export async function paginate(path, token, collectionKey) {
   }
 }
 
-export function readyRunForTransition(transition, workflowRuns, prNumber) {
-  const transitionTime = new Date(transition.created_at).getTime();
-  return workflowRuns
-    .filter((item) => item.name === "Factory Gates" && item.event === "pull_request")
-    .filter((item) => item.pull_requests?.some((pull) => pull.number === prNumber))
-    .filter((item) => {
-      const runTime = new Date(item.created_at).getTime();
-      return runTime >= transitionTime && runTime - transitionTime <= 5 * 60 * 1000;
-    })
-    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-    .at(0);
-}
-
 function linkedIssueNumber(body) {
   const match = body.match(/(?:close[sd]?|fixe[sd]?|resolve[sd]?)\s+#(\d+)/i);
   return match ? Number(match[1]) : null;
@@ -234,23 +249,28 @@ async function hasWritePermission(apiRoot, login, token) {
   }
 }
 
-async function liveContext(event, token, repository) {
-  const prNumber = event.pull_request?.number;
-  if (!prNumber) throw new Error("Only pull_request events are supported");
+async function charterDefaultGateLevel() {
+  const value = await readFile("docs/factory/CHARTER.md", "utf8");
+  const matches = [...value.matchAll(/^\s*default:\s*(fast|full|deep)\s*$/gm)];
+  if (matches.length !== 1) throw new Error("CHARTER.md must define exactly one default Gate level");
+  return matches[0][1];
+}
+
+async function githubContext(prNumber, token, repository) {
   const [owner, repo] = repository.split("/");
+  if (!owner || !repo) throw new Error("Repository must be owner/name");
   const apiRoot = `/repos/${owner}/${repo}`;
   const pr = await github(`${apiRoot}/pulls/${prNumber}`, token);
   const issueNumber = linkedIssueNumber(pr.body ?? "");
   if (!issueNumber) throw new Error("PR body must contain Closes #<issue>");
 
-  const [issue, issueComments, prComments, timeline, prFiles, openPulls, workflowRuns] = await Promise.all([
+  const [issue, issueComments, prComments, timeline, prFiles, openPulls] = await Promise.all([
     github(`${apiRoot}/issues/${issueNumber}`, token),
     paginate(`${apiRoot}/issues/${issueNumber}/comments`, token),
     paginate(`${apiRoot}/issues/${prNumber}/comments`, token),
     paginate(`${apiRoot}/issues/${prNumber}/timeline`, token),
     paginate(`${apiRoot}/pulls/${prNumber}/files`, token),
     paginate(`${apiRoot}/pulls?state=open`, token),
-    paginate(`${apiRoot}/actions/runs?event=pull_request&branch=${encodeURIComponent(pr.head.ref)}`, token, "workflow_runs"),
   ]);
   const openLinkedPrs = openPulls
     .filter((candidate) => linkedIssueNumber(candidate.body ?? "") === issueNumber)
@@ -269,20 +289,12 @@ async function liveContext(event, token, repository) {
   }
 
   const rawTransitions = timeline.filter((item) => ["ready_for_review", "convert_to_draft"].includes(item.event));
-  const readyRuns = new Map();
-  for (const transition of rawTransitions.filter((item) => item.event === "ready_for_review")) {
-    const run = readyRunForTransition(transition, workflowRuns, prNumber);
-    if (run) readyRuns.set(transition.id, run);
-  }
   const trustedLogins = new Map();
   for (const transition of rawTransitions) {
     const login = transition.actor?.login;
     if (login && !trustedLogins.has(login)) trustedLogins.set(login, await hasWritePermission(apiRoot, login, token));
   }
-  const transitionShas = [
-    ...rawTransitions.map((item) => item.commit_id),
-    ...[...readyRuns.values()].map((run) => run.head_sha),
-  ].filter(isFullSha);
+  const transitionShas = rawTransitions.map((item) => item.commit_id).filter(isFullSha);
   const comparisons = {};
   for (const sha of new Set(transitionShas)) {
     const comparison = await github(`${apiRoot}/compare/${sha}...${pr.head.sha}`, token);
@@ -326,8 +338,6 @@ async function liveContext(event, token, repository) {
     specTransitions: rawTransitions.map((transition) => ({
       event: transition.event,
       commitId: transition.commit_id,
-      runHeadSha: readyRuns.get(transition.id)?.head_sha,
-      runUrl: readyRuns.get(transition.id)?.html_url,
       trustedActor: trustedLogins.get(transition.actor?.login) === true,
       createdAt: transition.created_at,
       url: transition.url,
@@ -336,27 +346,58 @@ async function liveContext(event, token, repository) {
     comparisons,
     pattern,
     hasReviewedSpec,
+    defaultGateLevel: await charterDefaultGateLevel(),
   };
+}
+
+function argument(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+async function ghOutput(args) {
+  try {
+    const { stdout } = await execFileAsync("gh", args, { encoding: "utf8" });
+    const value = stdout.trim();
+    if (value) return value;
+  } catch {
+    // The caller reports one stable setup error below.
+  }
+  return null;
+}
+
+async function externalInvocation() {
+  const prValue = argument("--pr");
+  const prNumber = Number(prValue);
+  if (!Number.isInteger(prNumber) || prNumber < 1) {
+    throw new Error("Usage: validate-pr-state.mjs --pr <number> [--repo owner/name]");
+  }
+  const repository = argument("--repo") ?? process.env.GITHUB_REPOSITORY ??
+    await ghOutput(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
+  if (!repository) throw new Error("Cannot determine repository; pass --repo owner/name");
+  const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? await ghOutput(["auth", "token"]);
+  if (!token) throw new Error("GitHub authentication unavailable; authenticate gh or set GH_TOKEN");
+  return githubContext(prNumber, token, repository);
 }
 
 async function main() {
   const fixtureIndex = process.argv.indexOf("--fixture");
   const context = fixtureIndex >= 0
     ? JSON.parse(await readFile(process.argv[fixtureIndex + 1], "utf8"))
-    : await liveContext(
-      JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, "utf8")),
-      process.env.GITHUB_TOKEN,
-      process.env.GITHUB_REPOSITORY,
-    );
-  const result = validateGateContext(context);
-  for (const error of result.errors) console.error(`FACTORY_PR_GATE_ERROR: ${error}`);
-  console.log(`FACTORY_PR_GATES: status=${result.ok ? "GREEN" : "RED"} errors=${result.errors.join(",") || "none"}`);
+    : await externalInvocation();
+  const result = validatePrState(context);
+  for (const error of result.errors) console.error(`FACTORY_PR_STATE_ERROR: ${error}`);
+  let gateLevel = "none";
+  if (result.ok) {
+    gateLevel = selectGateLevel(context);
+  }
+  console.log(`FACTORY_PR_STATE: status=${result.ok ? "GREEN" : "RED"} gate_level=${gateLevel} errors=${result.errors.join(",") || "none"}`);
   if (!result.ok) process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
   main().catch((error) => {
-    console.error(`FACTORY_PR_GATES: status=MISCONFIGURED error=${error.message}`);
+    console.error(`FACTORY_PR_STATE: status=MISCONFIGURED error=${error.message}`);
     process.exitCode = 2;
   });
 }

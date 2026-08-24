@@ -22,10 +22,10 @@ for runner in runner-a runner-b; do
 done
 
 set +e
-(cd "$fixture/runner-a" && "$ROOT/template/.factory/scripts/claim.sh" 142 runner-a "Add CSV export") \
+(cd "$fixture/runner-a" && "$ROOT/template/.factory/scripts/claim.sh" 142 runner-a) \
   > "$fixture/runner-a.out" 2>&1 &
 runner_a_pid=$!
-(cd "$fixture/runner-b" && "$ROOT/template/.factory/scripts/claim.sh" 142 runner-b "Add CSV export") \
+(cd "$fixture/runner-b" && "$ROOT/template/.factory/scripts/claim.sh" 142 runner-b) \
   > "$fixture/runner-b.out" 2>&1 &
 runner_b_pid=$!
 wait "$runner_a_pid"; runner_a_status=$?
@@ -33,17 +33,27 @@ wait "$runner_b_pid"; runner_b_status=$?
 set -e
 
 [ $((runner_a_status + runner_b_status)) -eq 3 ]
-[ "$(grep -h -c 'status=CLAIMED branch=issue/142-add-csv-export' "$fixture/runner-a.out" "$fixture/runner-b.out" | awk '{ total += $1 } END { print total }')" -eq 1 ]
-[ "$(grep -h -E -c 'status=(EXISTS|LOST) branch=issue/142-add-csv-export' "$fixture/runner-a.out" "$fixture/runner-b.out" | awk '{ total += $1 } END { print total }')" -eq 1 ]
+[ "$(grep -h -c 'status=CLAIMED branch=issue/142' "$fixture/runner-a.out" "$fixture/runner-b.out" | awk '{ total += $1 } END { print total }')" -eq 1 ]
+[ "$(grep -h -E -c 'status=(EXISTS|LOST) branch=issue/142' "$fixture/runner-a.out" "$fixture/runner-b.out" | awk '{ total += $1 } END { print total }')" -eq 1 ]
 
-unicode_branch="$(cd "$fixture/runner-a" && git switch -q main && "$ROOT/template/.factory/scripts/claim.sh" 143 runner-a "修复 登录/超时")"
-printf '%s' "$unicode_branch" | grep -q 'status=CLAIMED branch=issue/143-修复-登录-超时'
+first_branch="$(cd "$fixture/runner-a" && git switch -q main && "$ROOT/template/.factory/scripts/claim.sh" 143 runner-a)"
+printf '%s' "$first_branch" | grep -q 'status=CLAIMED branch=issue/143'
 
 set +e
-renamed_issue="$(cd "$fixture/runner-b" && "$ROOT/template/.factory/scripts/claim.sh" 143 runner-b "更新后的标题" 2>&1)"
-renamed_status=$?
+existing_issue="$(cd "$fixture/runner-b" && "$ROOT/template/.factory/scripts/claim.sh" 143 runner-b 2>&1)"
+existing_status=$?
 set -e
-[ "$renamed_status" -eq 3 ]
-printf '%s' "$renamed_issue" | grep -q 'status=EXISTS branch=issue/143-修复-登录-超时'
+[ "$existing_status" -eq 3 ]
+printf '%s' "$existing_issue" | grep -q 'status=EXISTS branch=issue/143'
+
+# Updating an existing installation must recognize an in-flight legacy branch
+# rather than creating a second stable claim for the same Issue.
+git -C "$fixture/seed" push -q origin main:issue/144-legacy-title
+set +e
+legacy_issue="$(cd "$fixture/runner-a" && git switch -q main && "$ROOT/template/.factory/scripts/claim.sh" 144 runner-a 2>&1)"
+legacy_status=$?
+set -e
+[ "$legacy_status" -eq 3 ]
+printf '%s' "$legacy_issue" | grep -q 'status=EXISTS branch=issue/144-legacy-title'
 
 echo "claim: ok"

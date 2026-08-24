@@ -3,7 +3,7 @@
 ```bash
 ./install.sh /path/to/project
 cd /path/to/project
-# 编辑 .factory/project.json、docs/factory/CHARTER.md、AGENTS.md、gates.conf
+# 编辑 docs/factory/CHARTER.md、AGENTS.md、gates.conf
 ./.factory/scripts/doctor.sh
 ./.factory/scripts/bootstrap-github.sh --apply
 git add . && git commit -m "chore: install Issue Agent Factory" && git push

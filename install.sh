@@ -60,11 +60,10 @@ if [ "$DRY" -eq 0 ]; then
     .factory/hooks/block-merge.sh \
     .factory/scripts/bootstrap-github.sh \
     .factory/scripts/claim.sh \
-    .factory/scripts/ci-setup.sh \
     .factory/scripts/doctor.sh \
     .factory/scripts/gates.sh \
     .factory/scripts/prove-test.sh \
-    .factory/scripts/validate-pr-gates.mjs; do
+    .factory/scripts/validate-pr-state.mjs; do
     chmod +x "$TARGET/$path" 2>/dev/null || true
   done
 fi
@@ -73,11 +72,11 @@ cat <<'EOF'
 
 下一步：
 
-  1. 填写 .factory/project.json、docs/factory/CHARTER.md 和 AGENTS.md。
-  2. 按项目调整 .factory/gates.conf 与 .factory/scripts/ci-setup.sh。
+  1. 填写 docs/factory/CHARTER.md 和 AGENTS.md。
+  2. 按项目调整 .factory/gates.conf。
   3. 运行 ./.factory/scripts/doctor.sh 和 ./.factory/scripts/gates.sh full。
   4. 运行 ./.factory/scripts/bootstrap-github.sh --apply。
-  5. 提交并推送，在 GitHub 保护默认分支并要求 Factory Gates 检查。
+  5. 提交并推送，在 GitHub 保护默认分支，禁止 Agent 绕过或直接合并。
   6. 用一个真实普通 Issue 完成首次 Draft/Ready 校准。
 
 详细说明见 GETTING_STARTED.md（框架仓库）和 docs/factory/README.md（目标项目）。
