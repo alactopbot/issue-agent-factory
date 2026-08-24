@@ -1,0 +1,32 @@
+{
+  "skill_name": "issue-agent-factory-workflow",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "一个已有 Web 项目收到 GitHub Issue：给报表页增加 CSV 导出。需求包含按钮交互、导出字段、错误提示、测试和验收。当前没有匹配 Pattern。请说明你会如何用 Issue 驱动流程推进到可以开始实现；不要访问真实 GitHub，只输出 plan.md。",
+      "expected_output": "形成单一完整需求和统一 Spec，只创建一个 Draft PR；人工通过普通评论反馈、通过 Ready for review 批准，不拆分内部步骤或要求结构化人工协议。",
+      "files": [],
+      "expectations": [
+        "输出将整个 CSV 导出视为一个可独立验收的需求，不为按钮、字段、测试分别创建 Issue 或 PR",
+        "输出要求在同一个 Draft PR 中提交产品、技术、风险、测试和验收的统一 Spec",
+        "输出说明不通过时保持 Draft 并留普通评论，通过时点击 Ready for review",
+        "输出不要求人类填写 SHA、关键词、摘要或结构化评论",
+        "输出说明最终合并由人类完成且合并代表产品验收"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "你在恢复一个定时 Agent 任务：Issue #42 已有唯一 Draft PR #43，PR 仍是 Draft，维护者刚留普通评论要求不要新增依赖并调整空状态；另一个场景是同类需求命中 trusted Pattern 且 PR 已有候选实现。请分别说明下一步，不访问真实 GitHub，只输出 recovery.md。",
+      "expected_output": "Draft 场景在同一 PR 修订 Spec 并继续等待 Ready；trusted 场景可省略方案确认并直接使用非 Draft PR，但仍执行完整范围、Gate、独立验证并等待人工合并。",
+      "files": [],
+      "expectations": [
+        "Draft 场景读取普通评论并在同一 PR 修订 design.md 与 factory.json，不创建第二个 PR",
+        "Draft 场景不会开始实现，也不会替人点击 Ready for review",
+        "trusted 场景只省略 Spec 人工确认，不省略确定性 Gate、独立验证或人工合并",
+        "trusted 场景不要求人类再做一次 Ready 操作，PR 应由方案阶段直接创建为非 Draft",
+        "输出把 GitHub Issue、PR、时间线和 Checks 作为恢复来源，而不是依赖 Agent 会话",
+        "输出不引入 QUEUE、STATE、runs 流水账或按行数限制范围"
+      ]
+    }
+  ]
+}

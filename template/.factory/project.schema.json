@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Issue Agent Factory project policy",
+  "type": "object",
+  "required": ["factoryVersion", "project", "tier", "language", "humanPolicy", "maturity", "automation", "evidence"],
+  "properties": {
+    "factoryVersion": { "const": 2 },
+    "project": { "type": "string", "minLength": 1, "not": { "pattern": "^<.*>$" } },
+    "tier": { "enum": ["revival", "greenfield", "oss", "client-production"] },
+    "language": {
+      "type": "object",
+      "required": ["workflow", "productPrimary", "code"],
+      "properties": {
+        "workflow": { "type": "string", "minLength": 2, "not": { "pattern": "^<.*>$" } },
+        "productPrimary": { "type": "string", "minLength": 2, "not": { "pattern": "^<.*>$" } },
+        "code": { "type": "string", "minLength": 2 }
+      },
+      "additionalProperties": true
+    },
+    "humanPolicy": {
+      "type": "object",
+      "required": ["merge", "gateChannel", "specDecision", "productAcceptance", "existingTestChange", "newDependency", "outsidePattern"],
+      "properties": {
+        "merge": { "const": "always" },
+        "gateChannel": { "const": "github-pr" },
+        "specDecision": { "const": "draft-ready" },
+        "productAcceptance": { "const": "merge" },
+        "existingTestChange": { "const": "github-spec-ready" },
+        "newDependency": { "const": "always" },
+        "outsidePattern": { "const": "always" }
+      },
+      "additionalProperties": false
+    },
+    "maturity": {
+      "type": "object",
+      "required": ["levels", "autonomousEnabled"],
+      "properties": {
+        "levels": { "const": ["bootstrap", "supervised", "trusted", "autonomous"] },
+        "autonomousEnabled": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "automation": {
+      "type": "object",
+      "required": ["autoMerge", "autoDeploy"],
+      "properties": {
+        "autoMerge": { "const": false },
+        "autoDeploy": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "evidence": { "type": "object" }
+  },
+  "additionalProperties": false
+}

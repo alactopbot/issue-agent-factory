@@ -1,0 +1,34 @@
+{
+  "$schema": "./project.schema.json",
+  "factoryVersion": 2,
+  "project": "<PROJECT_NAME>",
+  "tier": "<PROJECT_TIER>",
+  "language": {
+    "workflow": "<WORKFLOW_LANGUAGE>",
+    "productPrimary": "<PRODUCT_LANGUAGE>",
+    "code": "en"
+  },
+  "humanPolicy": {
+    "merge": "always",
+    "gateChannel": "github-pr",
+    "specDecision": "draft-ready",
+    "productAcceptance": "merge",
+    "existingTestChange": "github-spec-ready",
+    "newDependency": "always",
+    "outsidePattern": "always"
+  },
+  "maturity": {
+    "levels": ["bootstrap", "supervised", "trusted", "autonomous"],
+    "autonomousEnabled": false
+  },
+  "automation": {
+    "autoMerge": false,
+    "autoDeploy": false
+  },
+  "evidence": {
+    "liveState": "github",
+    "checks": "github-checks",
+    "requirementDecision": "docs/requirements",
+    "finalDelivery": "docs/requirements-and-github-comment"
+  }
+}

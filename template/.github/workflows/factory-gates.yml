@@ -1,0 +1,34 @@
+name: Factory Gates
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled, ready_for_review, converted_to_draft]
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: factory-gates-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  factory-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install project dependencies
+        run: ./.factory/scripts/ci-setup.sh
+      - name: Validate Factory PR protocol
+        run: node .factory/scripts/validate-pr-gates.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Run deterministic gates
+        run: ./.factory/scripts/gates.sh deep
