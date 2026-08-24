@@ -1,37 +1,50 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Issue Agent Factory reusable requirement pattern",
+  "title": "Issue Agent Factory explicitly authorized requirement pattern",
   "type": "object",
-  "required": ["id", "version", "maturity", "appliesWhen", "allowedChanges", "preserved", "humanGates", "promotion", "demoteOn"],
+  "required": ["id", "version", "enabled", "activation", "scope", "execution"],
   "properties": {
-    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*-v[0-9]+$" },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
     "version": { "type": "integer", "minimum": 1 },
-    "maturity": { "enum": ["bootstrap", "supervised", "trusted", "autonomous"] },
-    "appliesWhen": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
-    "allowedChanges": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
-    "preserved": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
-    "humanGates": {
+    "enabled": { "type": "boolean" },
+    "activation": {
       "type": "object",
-      "required": ["bootstrap", "supervised", "trusted", "autonomous"],
+      "required": ["issueLabel"],
       "properties": {
-        "bootstrap": { "const": ["spec-ready", "merge"] },
-        "supervised": { "const": ["spec-ready", "merge"] },
-        "trusted": { "const": ["merge"] },
-        "autonomous": { "const": ["merge"] }
+        "issueLabel": { "type": "string", "pattern": "^factory:pattern:[a-z0-9]+(?:-[a-z0-9]+)*$" }
       },
       "additionalProperties": false
     },
-    "promotion": {
+    "scope": {
       "type": "object",
-      "required": ["consecutiveCleanRuns"],
-      "properties": { "consecutiveCleanRuns": { "type": "integer", "minimum": 1 } }
+      "required": ["allowedPaths", "preserved"],
+      "properties": {
+        "allowedPaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "preserved": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
     },
-    "demoteOn": { "type": "array", "minItems": 1, "items": { "enum": ["human-spec-change", "human-product-change", "verifier-rejected", "escaped-defect", "scope-violation", "pattern-version-change"] } },
-    "autonomousEligibility": {
+    "execution": {
       "type": "object",
-      "properties": { "enabled": { "type": "boolean" } },
-      "additionalProperties": true
+      "required": ["planReview", "gateLevel", "independentVerification", "completion"],
+      "properties": {
+        "planReview": { "const": "none" },
+        "gateLevel": { "enum": ["fast", "full", "deep"] },
+        "independentVerification": { "const": "required" },
+        "completion": { "const": "verified-pr" }
+      },
+      "additionalProperties": false
     }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

@@ -17,7 +17,7 @@ labels=(
   "factory:ready-to-spec|FBCA04|Needs one unified product and technical spec"
   "factory:plan-review|FBCA04|Draft PR waiting for comments or Ready for review"
   "factory:wait-to-implement|C5DEF5|Waiting for Draft PR feedback or Ready decision"
-  "factory:ready-to-implement|0E8A16|Approved spec or trusted pattern; implementation may resume"
+  "factory:ready-to-implement|0E8A16|Approved spec or explicitly enabled pattern; implementation may resume"
   "factory:needs-info|D93F0B|Blocked on one decision that changes the result"
   "factory:in-progress|1D76DB|The unique requirement PR is being implemented or verified"
   "factory:awaiting-review|5319E7|Verified delivery waiting for human merge"

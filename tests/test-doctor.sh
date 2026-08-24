@@ -28,11 +28,4 @@ sed -i.bak \
   -e 's/TIER: <revival | greenfield | oss | client-production>/TIER: greenfield/' "$fixture/docs/factory/CHARTER.md"
 rm -f "$fixture"/*.bak "$fixture/.factory"/*.bak "$fixture/docs/factory"/*.bak
 (cd "$fixture" && ./.factory/scripts/doctor.sh >/dev/null)
-
-mkdir -p "$fixture/.claude"
-set +e
-(cd "$fixture" && ./.factory/scripts/doctor.sh > "$fixture/claude.log" 2>&1); claude_status=$?
-set -e
-[ "$claude_status" -ne 0 ]
-grep -q 'Codex-only' "$fixture/claude.log"
 echo "doctor: ok"

@@ -1,14 +1,23 @@
 ---
 name: factory-tune
-description: 基于近期合并 PR、Factory 验证与交付证据评估 Pattern 和流程约束，提出晋级、降级、收紧或放宽建议。用于周期复盘；未经人工批准不修改规则。
+description: Review real Factory delivery evidence and propose clearer Patterns, Gates, or charter boundaries without changing authority. Use for periodic workflow improvement after repeated Issues, review corrections, verification failures, or escaped defects.
 ---
 
-# Factory 调优
+# Factory tuning
 
-读取最近 30 天或章程上次复核以来的合并 PR、Checks、验证评论、Issue 时间线、逃逸缺陷和
-`factory-delivery`。分析 Pattern 连续干净执行、人工反复修改、验证常见问题、逃逸缺陷、人工等待
-瓶颈和 Gate 误配置。
+Tuning converts repeated evidence into a proposal for human review. It does not change workflow authority directly.
 
-每项建议必须链接真实 Issue、PR、Check 或评论，并说明变化、收益、风险和撤销条件。只提出建议；
-不得自行修改章程、项目配置、Pattern 或 Gate。获批决定记录到 `docs/factory/DECISIONS.md`，机读规则
-变化仍通过一个独立需求 PR。最后回答：Factory 产生的产品价值是否值得它占用的人工注意力。
+Analyze linked Issues, pull requests, review decisions, Gate results, verification findings, and escaped defects. Look for:
+
+- a repeated complete requirement whose activation signal, allowed paths, preserved invariants, and verification method
+  can be stated precisely;
+- recurring review corrections that reveal a missing Spec question or charter boundary;
+- recurring verification failures that belong in a deterministic Gate;
+- Gate skips or false confidence that should fail closed;
+- waiting queues that reveal an avoidable human bottleneck.
+
+For each proposal, cite the evidence and describe the configuration change, benefit, risk, and rollback. A Pattern proposal
+must be a normal pull request that a user chooses to merge and later selects with an Issue label.
+
+Pattern, charter, and Gate changes are outputs of a separate reviewable pull request. This skill produces the evidence and
+recommendation for that decision; it does not apply or merge the change.

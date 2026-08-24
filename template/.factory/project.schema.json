@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Issue Agent Factory project policy",
   "type": "object",
-  "required": ["factoryVersion", "project", "tier", "language", "humanPolicy", "maturity", "automation", "evidence"],
+  "required": ["factoryVersion", "project", "tier", "language", "defaults", "automation", "evidence"],
   "properties": {
-    "factoryVersion": { "const": 2 },
+    "factoryVersion": { "const": 3 },
     "project": { "type": "string", "minLength": 1, "not": { "pattern": "^<.*>$" } },
     "tier": { "enum": ["revival", "greenfield", "oss", "client-production"] },
     "language": {
@@ -17,26 +17,13 @@
       },
       "additionalProperties": true
     },
-    "humanPolicy": {
+    "defaults": {
       "type": "object",
-      "required": ["merge", "gateChannel", "specDecision", "productAcceptance", "existingTestChange", "newDependency", "outsidePattern"],
+      "required": ["planReview", "gateLevel", "completion"],
       "properties": {
-        "merge": { "const": "always" },
-        "gateChannel": { "const": "github-pr" },
-        "specDecision": { "const": "draft-ready" },
-        "productAcceptance": { "const": "merge" },
-        "existingTestChange": { "const": "github-spec-ready" },
-        "newDependency": { "const": "always" },
-        "outsidePattern": { "const": "always" }
-      },
-      "additionalProperties": false
-    },
-    "maturity": {
-      "type": "object",
-      "required": ["levels", "autonomousEnabled"],
-      "properties": {
-        "levels": { "const": ["bootstrap", "supervised", "trusted", "autonomous"] },
-        "autonomousEnabled": { "type": "boolean" }
+        "planReview": { "const": "required" },
+        "gateLevel": { "enum": ["fast", "full", "deep"] },
+        "completion": { "const": "verified-pr" }
       },
       "additionalProperties": false
     },
@@ -49,7 +36,17 @@
       },
       "additionalProperties": false
     },
-    "evidence": { "type": "object" }
+    "evidence": {
+      "type": "object",
+      "required": ["liveState", "checks", "requirementDecision", "finalDelivery"],
+      "properties": {
+        "liveState": { "const": "github" },
+        "checks": { "const": "github-checks" },
+        "requirementDecision": { "const": "docs/requirements" },
+        "finalDelivery": { "const": "docs/requirements-and-github-comment" }
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false
 }

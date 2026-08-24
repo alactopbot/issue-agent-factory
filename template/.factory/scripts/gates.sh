@@ -34,7 +34,8 @@ esac
 
 REQUIRED_FAST="types lint"
 REQUIRED_FULL="types lint test"
-REQUIRED_DEEP="types lint test audit architecture"
+REQUIRED_DEEP="types lint test audit"
+ARCHITECTURE_COMMAND=""
 if [ -f .factory/gates.conf ]; then
   # This file is protected by the factory contract and contains assignments only.
   # shellcheck disable=SC1091
@@ -180,7 +181,11 @@ fi
 if [ "$LEVEL" = "deep" ]; then
   case "$STACK" in
     node)
-      run audit $PM audit --audit-level=high
+      if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f pnpm-lock.yaml ] || [ -f yarn.lock ] || [ -f bun.lockb ]; then
+        run audit $PM audit --audit-level=high
+      else
+        skip audit "no package-manager lockfile"
+      fi
       if pkg_has mutation; then run mutation $PMRUN mutation
       else skip mutation "no 'mutation' script (see CHARTER.md - coverage is not a substitute)"; fi
       ;;
@@ -200,18 +205,10 @@ if [ "$LEVEL" = "deep" ]; then
       ;;
   esac
 
-  # Architecture rules: plain grep assertions are enough to start and are
-  # impossible for an agent to argue with. Add your own below.
-  printf '\n=== gate: architecture ===\n'
-  ARCH_FAIL=0
-  # Example rule: nothing outside src/db may import the raw database client.
-  # if grep -rn "from '.*db/client'" src --include='*.ts' | grep -v '^src/db/'; then
-  #   c_red "architecture: db/client imported outside src/db"; ARCH_FAIL=1
-  # fi
-  if [ "$ARCH_FAIL" -eq 0 ]; then
-    c_green "PASS  architecture"; PASSED=$((PASSED + 1)); PASSING="${PASSING}${PASSING:+,}architecture"
+  if [ -n "$ARCHITECTURE_COMMAND" ]; then
+    run architecture bash -lc "$ARCHITECTURE_COMMAND"
   else
-    c_red   "FAIL  architecture"; FAILED=$((FAILED + 1)); FAILING="${FAILING}${FAILING:+,}architecture"
+    skip architecture "no ARCHITECTURE_COMMAND configured"
   fi
 fi
 

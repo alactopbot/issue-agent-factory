@@ -12,23 +12,25 @@ async function filesUnder(relative) {
   return entries.filter((entry) => entry.isFile()).map((entry) => path.join(entry.parentPath, entry.name));
 }
 
-test("installed template is Codex-only and contains no duplicated live state", async () => {
+test("installed workflow has one portable canonical layout", async () => {
   const files = await filesUnder("template/");
-  assert.equal(files.some((file) => file.includes("/.claude/") || file.endsWith("/CLAUDE.md")), false);
-  assert.equal(files.some((file) => /docs\/factory\/(QUEUE|STATE)\.md$/.test(file)), false);
-  assert.equal(files.some((file) => file.includes("/docs/factory/runs/")), false);
-  assert.equal(files.some((file) => file.includes("factory-fire.yml")), false);
+  assert.equal(files.filter((file) => file.endsWith("/AGENTS.md")).length, 1);
+  assert.equal(files.filter((file) => /\/\.agents\/skills\/factory-[^/]+\/SKILL\.md$/.test(file)).length, 7);
+  assert.equal(files.filter((file) => file.endsWith("/docs/factory/CONTRACT.md")).length, 1);
 });
 
-test("every Codex Factory skill is complete and independent", async () => {
+test("AGENTS and every Factory skill are complete, portable, and runtime-neutral", async () => {
   const names = ["triage", "spec", "implement", "verify", "monitor", "status", "tune"];
+  const agents = await read("template/AGENTS.md");
+  assert.doesNotMatch(agents, /Codex|Claude|OpenAI|Anthropic/i);
   for (const name of names) {
     const skill = await read(`template/.agents/skills/factory-${name}/SKILL.md`);
     assert.match(skill, /^---\nname: factory-/);
-    assert.doesNotMatch(skill, /\.claude|Claude Code|适配器/);
+    assert.doesNotMatch(skill, /Codex|Claude|OpenAI|Anthropic|\.claude/i);
   }
   assert.match(await read("template/.agents/skills/factory-spec/SKILL.md"), /Ready for review/);
-  assert.match(await read("template/.agents/skills/factory-implement/SKILL.md"), /全新 Codex 验证 Agent/);
+  assert.match(await read("template/.agents/skills/factory-implement/SKILL.md"), /fresh independent Agent context/);
+  assert.match(await read("template/.agents/skills/factory-implement/SKILL.md"), /issue-number.*exact Issue title/s);
 });
 
 test("framework has no project business residue or line-count policy", async () => {
@@ -40,11 +42,28 @@ test("framework has no project business residue or line-count policy", async () 
 
 test("policy preserves one requirement, one PR and human merge", async () => {
   const contract = await read("template/docs/factory/CONTRACT.md");
-  assert.match(contract, /一个完整需求对应一个 Issue、一个分支和一个 PR/);
+  assert.match(contract, /一个用户可独立验收的完整需求对应一个 Issue、一个分支和一个 PR/);
   assert.match(contract, /<!-- factory-handoff -->/);
   assert.match(contract, /<!-- factory-verification -->/);
-  assert.match(contract, /<!-- factory-delivery -->/);
-  assert.match(contract, /最终都由人类合并/);
+  assert.match(contract, /最终合并代表产品验收/);
   assert.match(contract, /普通评论/);
-  assert.doesNotMatch(contract, /方案通过|Review changes|结构化人工评论/);
+  assert.doesNotMatch(contract, /Review changes|结构化人工评论/);
+});
+
+test("Patterns have an explicit user-controlled activation contract", async () => {
+  const schema = await read("template/.factory/pattern.schema.json");
+  const parsed = JSON.parse(schema);
+  const triage = await read("template/.agents/skills/factory-triage/SKILL.md");
+  assert.deepEqual(parsed.required, ["id", "version", "enabled", "activation", "scope", "execution"]);
+  assert.equal(parsed.properties.enabled.type, "boolean");
+  assert.match(parsed.properties.activation.properties.issueLabel.pattern, /factory:pattern:/);
+  assert.match(triage, /user-reviewed configuration is enabled on the default branch/);
+});
+
+test("ordinary requirements use one complete human-readable Spec", async () => {
+  const spec = await read("template/.agents/skills/factory-spec/SKILL.md");
+  assert.match(spec, /design\.md/);
+  assert.match(spec, /design\.md` is the complete plan authority/);
+  assert.match(await read("template/docs/requirements/README.md"), /design\.md/);
+  assert.match(await read("template/docs/requirements/README.md"), /delivery\.md/);
 });

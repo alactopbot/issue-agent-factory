@@ -1,12 +1,27 @@
-# Issue Agent Factory 仓库协作说明
+# Issue Agent Factory contributor guide
 
-这是用于安装到其他项目的 Codex-only 通用框架，不是某个产品仓库。
+This repository builds a portable, GitHub-based workflow for coding agents. It is framework infrastructure, not a
+product repository.
 
-- 所有可安装内容位于 `template/`；根目录是本框架自己的说明、安装器和测试。
-- 不得加入具体业务实体、产品语言规则、项目路径或某个仓库账号。
-- `.agents/skills/` 必须是完整实现，不能依赖 `.claude` 或机器外的私有提示词。
-- GitHub 是实时流程状态；不要恢复 QUEUE、STATE 或 runs 流水账。
-- 一个完整需求一个 Issue、一个分支、一个 PR；内部 work units 不产生人工 Gate。
-- 不用代码行数、文件数或提交数定义范围。
-- 修改文件使用补丁，保留用户已有改动；不执行自动合并或发布。
-- 运行 `bash tests/run.sh` 验证。skill 变化还要维护并执行 `evals/evals.json`。
+## Repository boundaries
+
+- Everything installed into another repository lives under `template/`; root files document, install, and test the
+  framework itself.
+- Keep installed guidance free of product-specific entities, language rules, repository paths, accounts, and
+  agent-runtime branding.
+- `.agents/skills/` is the complete, portable workflow. Runtime adapters may expose it, but must not contain a second
+  canonical implementation.
+- GitHub is the live workflow state.
+
+## Workflow invariants
+
+- One independently acceptable requirement uses one Issue, one branch, and one pull request.
+- Internal work units do not create additional human gates.
+- Scope follows product outcomes and explicit authorization, not line, file, or commit counts.
+- Pattern authority comes from a user-reviewed configuration on the default branch and explicit Issue selection.
+- Agents do not merge or publish.
+
+## Development
+
+Use patches for file changes and preserve unrelated user work. Run `bash tests/run.sh` before handing off changes. When a
+skill changes, update and execute `evals/evals.json` as well.

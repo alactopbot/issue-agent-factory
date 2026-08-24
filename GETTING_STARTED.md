@@ -41,17 +41,25 @@ Gate 必须真正执行；必需项被跳过会返回 `MISCONFIGURED`，而不�
 
 ## 5. 首次校准
 
-用一个真实、完整但风险可控的需求建立第一个 Pattern：
+先用一个真实、完整但风险可控的普通需求校准流程：
 
 1. 创建 GitHub Issue。
-2. 让 Codex 使用 `factory-triage`，随后使用 `factory-spec`。
+2. 让 Agent 使用 `factory-triage`，随后使用 `factory-spec`。
 3. 在 Draft PR 审阅统一 Spec；有问题就留评论，没有问题就点 Ready for review。
-4. 让后续 Codex 使用 `factory-implement`；它会请求独立 Codex 验证。
+4. 让后续执行会话使用 `factory-implement`；它会请求独立验证上下文。
 5. 检查产品并合并。
 
-前几次同类迭代保留方案确认。证据足够后，通过独立 PR 把 Pattern 晋级为 `trusted`。
+当项目已经有明确、固定且需要扩规模执行的需求模式时，由用户通过独立普通 PR 新建
+`.factory/patterns/<id>.json`，明确激活标签、允许路径、不变量和 Gate，并设置 `enabled: true`。后续
+Issue 只有显式带该 Pattern 标签才省略方案确认。
+
+Pattern 合并后，由用户创建配置中同名的激活标签，例如：
+
+```bash
+gh label create "factory:pattern:<id>" --description "Use enabled Pattern <id>" --color "5319E7"
+```
 
 ## 6. 自动化
 
-在 Codex 中为项目建立一个 scheduled task，提示词使用 [AUTOMATIONS.md](AUTOMATIONS.md) 的模板。
+在所选 Agent 运行器中为项目建立 scheduled task，提示词使用 [AUTOMATIONS.md](AUTOMATIONS.md) 的模板。
 定时任务只负责轮询和推进；GitHub Issue/PR/Checks 始终是可恢复状态，聊天不是批准来源。

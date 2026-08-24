@@ -5,7 +5,7 @@
 # not the enforcement boundary: tool hooks cannot cover every hosted/API path.
 # Protect the default branch with a GitHub ruleset and do not grant agents bypass.
 #
-# Wired as a PreToolUse hook for Codex in .codex/hooks.json.
+# Wired through the optional runtime adapter in .codex/hooks.json.
 # Reads the tool call as JSON on stdin. Exit 2 blocks the call and returns
 # stderr to the agent as feedback.
 

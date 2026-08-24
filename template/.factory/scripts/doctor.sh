@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 检查 Codex-only Factory 是否完成安全初始化。
+# 检查 Factory 是否完成安全初始化。
 
 set -uo pipefail
 
@@ -20,8 +20,8 @@ required_files=(
   .factory/project.json
   .factory/project.schema.json
   .factory/pattern.schema.json
-  .factory/requirement.schema.json
   .factory/gates.conf
+  .factory/scripts/claim.sh
   .factory/scripts/gates.sh
   .factory/scripts/prove-test.sh
   .factory/scripts/validate-pr-gates.mjs
@@ -33,16 +33,14 @@ for path in "${required_files[@]}"; do
   [ -f "$path" ] && pass "$path exists" || fail "$path is missing"
 done
 
+command -v node >/dev/null 2>&1 \
+  && pass "Node.js available for claim and protocol validation" \
+  || fail "Node.js is required for claim and protocol validation"
+
 for path in .factory/scripts/*.sh .factory/hooks/*.sh; do
   [ -e "$path" ] || continue
   [ -x "$path" ] && pass "$path is executable" || fail "$path is not executable"
 done
-
-if [ -d .claude ] || [ -f CLAUDE.md ]; then
-  fail "Claude-specific files are present; this Factory distribution is Codex-only"
-else
-  pass "no Claude compatibility layer"
-fi
 
 if grep -q '<PROJECT_NAME>\|<PROJECT_TIER>\|<WORKFLOW_LANGUAGE>\|<PRODUCT_LANGUAGE>' .factory/project.json 2>/dev/null; then
   fail ".factory/project.json still contains setup placeholders"
@@ -66,12 +64,6 @@ grep -q '^CHARTER_STATUS: ready$' docs/factory/CHARTER.md 2>/dev/null \
   && pass "charter is marked ready" || fail "charter is not marked ready"
 grep -Eq '^TIER: (revival|greenfield|oss|client-production)$' docs/factory/CHARTER.md 2>/dev/null \
   && pass "charter tier is valid" || fail "charter tier is missing or invalid"
-
-if find docs/factory -type f \( -name 'QUEUE.md' -o -name 'STATE.md' \) | grep -q . || [ -d docs/factory/runs ]; then
-  fail "legacy Git-backed live state files are present"
-else
-  pass "GitHub is the only live state store"
-fi
 
 if git rev-parse --git-dir >/dev/null 2>&1; then
   pass "Git repository detected"

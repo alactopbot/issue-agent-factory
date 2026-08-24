@@ -1,6 +1,6 @@
 {
   "$schema": "./project.schema.json",
-  "factoryVersion": 2,
+  "factoryVersion": 3,
   "project": "<PROJECT_NAME>",
   "tier": "<PROJECT_TIER>",
   "language": {
@@ -8,18 +8,10 @@
     "productPrimary": "<PRODUCT_LANGUAGE>",
     "code": "en"
   },
-  "humanPolicy": {
-    "merge": "always",
-    "gateChannel": "github-pr",
-    "specDecision": "draft-ready",
-    "productAcceptance": "merge",
-    "existingTestChange": "github-spec-ready",
-    "newDependency": "always",
-    "outsidePattern": "always"
-  },
-  "maturity": {
-    "levels": ["bootstrap", "supervised", "trusted", "autonomous"],
-    "autonomousEnabled": false
+  "defaults": {
+    "planReview": "required",
+    "gateLevel": "full",
+    "completion": "verified-pr"
   },
   "automation": {
     "autoMerge": false,

@@ -26,7 +26,7 @@ LOAD_BEARING:
 TESTS_ARE_LOAD_BEARING: true
 ```
 
-既有测试语义变化必须写入统一 Spec 并通过 Draft/Ready 决定；成熟 Pattern 明确允许的机械迁移除外。
+既有测试语义变化必须写入统一 Spec 并通过 Draft/Ready 决定；用户显式启用的 Pattern 明确允许时除外。
 
 ## 自动化边界
 
@@ -35,16 +35,17 @@ TESTS_ARE_LOAD_BEARING: true
 ```text
 AUTOMATABLE:
   - <不改变产品行为的低风险维护>
-  - <成熟 Pattern 明确允许的完整需求>
+  - <用户显式启用的 Pattern 明确允许的完整需求>
 
 NEEDS_SPEC:
   - <新的用户可见能力>
   - <新依赖、公共 API、数据或基础设施变化>
-  - <超出 Pattern 的变化>
+  - <没有显式 Pattern 或超出 Pattern 的变化>
 
 NEVER_AUTOMATE:
   - 合并与发布决定
   - 未经批准的架构方向或权限扩大
+  - Agent 自行创建、启用或扩大 Pattern
   - <项目绝不允许 Agent 自主执行的工作>
 ```
 
@@ -55,8 +56,8 @@ DONE:
   - 规定等级 gates.sh 报告 GREEN
   - 行为变化有旧实现失败、新实现通过的证据
   - 完整需求成立且未越出批准范围
-  - Pattern 全部不变量得到验证
-  - 全新 Codex 上下文独立验证接受
+  - 显式 Pattern 的全部允许路径和不变量得到验证
+  - 隔离的新 Agent 上下文独立验证接受
   - PR 清楚说明结果、风险和证据
 
 GATES:

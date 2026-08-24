@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 将 Codex-only Issue Agent Factory 模板安装到目标 Git 仓库。
+# 将 Issue Agent Factory 模板安装到目标 Git 仓库。
 # 不覆盖已有文件；重复运行安全。
 
 set -euo pipefail
@@ -59,6 +59,7 @@ if [ "$DRY" -eq 0 ]; then
   for path in \
     .factory/hooks/block-merge.sh \
     .factory/scripts/bootstrap-github.sh \
+    .factory/scripts/claim.sh \
     .factory/scripts/ci-setup.sh \
     .factory/scripts/doctor.sh \
     .factory/scripts/gates.sh \
@@ -77,7 +78,7 @@ cat <<'EOF'
   3. 运行 ./.factory/scripts/doctor.sh 和 ./.factory/scripts/gates.sh full。
   4. 运行 ./.factory/scripts/bootstrap-github.sh --apply。
   5. 提交并推送，在 GitHub 保护默认分支并要求 Factory Gates 检查。
-  6. 用一个真实 Issue 完成首次 bootstrap 校准。
+  6. 用一个真实普通 Issue 完成首次 Draft/Ready 校准。
 
 详细说明见 GETTING_STARTED.md（框架仓库）和 docs/factory/README.md（目标项目）。
 EOF

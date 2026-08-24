@@ -1,41 +1,34 @@
-# <PROJECT_NAME> 的 Codex 协作说明
+# <PROJECT_NAME> collaboration guide
 
-## 项目上下文
+## Project context
 
-<用一段话说明产品、用户和最重要的不变量。>
+<Describe the product, its users, and the invariants that must remain true.>
 
-## 项目命令
+## Project commands
 
 ```bash
-# 安装依赖
+# Install dependencies
 <INSTALL_COMMAND>
 
-# 本地测试
+# Test
 <TEST_COMMAND>
 
-# 构建
+# Build
 <BUILD_COMMAND>
 
-# 本地运行
+# Run locally
 <RUN_COMMAND>
 ```
 
 ## Issue Agent Factory
 
-开始需求工作前读取：
+Before requirement work, read `docs/factory/CONTRACT.md`, `docs/factory/CHARTER.md`, and `.factory/project.json`, then
+use the applicable workflow under `.agents/skills/`.
 
-1. `docs/factory/CONTRACT.md`
-2. `docs/factory/CHARTER.md`
-3. `.factory/project.json`
-4. 适用的 `.factory/patterns/*.json`
+GitHub is the live state; chat history is not authorization. One complete requirement uses one Issue, one deterministic
+branch, and one pull request. Ordinary work requires a reviewed Spec. Only a Pattern that users have enabled and selected
+with the Issue's unique activation label may skip per-Issue plan review.
 
-GitHub Issue、唯一 PR、Draft/Ready 时间线、评论、标签和 Checks 是实时状态与人工决定来源。Agent 聊天
-不是授权。一个用户可独立验收的完整需求只使用一个 Issue、一个分支和一个 PR；内部 work units 不创建
-额外流程对象。
-
-按任务使用 `.agents/skills/` 中的 `factory-triage`、`factory-spec`、`factory-implement`、
-`factory-verify`、`factory-monitor`、`factory-status` 或 `factory-tune`。人工方案决定只通过 Draft PR 的
-Ready for review；trusted Pattern 直接使用非 Draft PR。最终合并就是产品验收。Codex 不替人批准需要
-人工方案决定的 PR，也不合并或发布。
-
-运行 `./.factory/scripts/gates.sh <fast|full|deep>` 获取确定性结论。必需 Gate 跳过或误配置不算绿色。
+Do not create or expand Pattern authority, split internal work into extra process objects, merge, or publish. Run
+`./.factory/scripts/gates.sh <fast|full|deep>` for the deterministic verdict; a required skip or misconfiguration is not
+green.

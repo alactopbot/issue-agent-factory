@@ -3,29 +3,46 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "一个已有 Web 项目收到 GitHub Issue：给报表页增加 CSV 导出。需求包含按钮交互、导出字段、错误提示、测试和验收。当前没有匹配 Pattern。请说明你会如何用 Issue 驱动流程推进到可以开始实现；不要访问真实 GitHub，只输出 plan.md。",
-      "expected_output": "形成单一完整需求和统一 Spec，只创建一个 Draft PR；人工通过普通评论反馈、通过 Ready for review 批准，不拆分内部步骤或要求结构化人工协议。",
+      "prompt": "一个已有 Web 项目收到 GitHub Issue：给报表页增加 CSV 导出。需求包含按钮交互、导出字段、错误提示、测试和验收，且没有匹配的 Pattern。请说明如何推进到 verified PR；不要访问真实 GitHub，只输出 plan.md。",
+      "expected_output": "原子认领后，在唯一 Draft PR 中用 design.md 承载统一 Spec，经普通评论和 Ready 后完成实现、Gate、独立验证，最终由人类合并。",
       "files": [],
       "expectations": [
-        "输出将整个 CSV 导出视为一个可独立验收的需求，不为按钮、字段、测试分别创建 Issue 或 PR",
-        "输出要求在同一个 Draft PR 中提交产品、技术、风险、测试和验收的统一 Spec",
-        "输出说明不通过时保持 Draft 并留普通评论，通过时点击 Ready for review",
-        "输出不要求人类填写 SHA、关键词、摘要或结构化评论",
-        "输出说明最终合并由人类完成且合并代表产品验收"
+        "把 CSV 导出视为一个完整需求，只使用一个 Issue、确定性分支和 PR",
+        "首次写仓库前用 Issue 编号、唯一运行 ID 和精确标题调用 claim.sh，只有 CLAIMED 才新建内容，EXISTS 或 LOST 时恢复或停止",
+        "design.md 是普通需求完整且唯一的方案权威，覆盖产品、技术、风险、测试和验收",
+        "Spec 保持 Draft 接收普通评论，只有人类点击 Ready for review 后才实现",
+        "实现后运行确定性 Gate，并由隔离的新 Agent 上下文独立验证当前 SHA",
+        "回答使用通用的 Agent 与独立验证角色描述执行流程",
+        "最终合并由人类完成且代表产品验收"
       ]
     },
     {
       "id": 2,
-      "prompt": "你在恢复一个定时 Agent 任务：Issue #42 已有唯一 Draft PR #43，PR 仍是 Draft，维护者刚留普通评论要求不要新增依赖并调整空状态；另一个场景是同类需求命中 trusted Pattern 且 PR 已有候选实现。请分别说明下一步，不访问真实 GitHub，只输出 recovery.md。",
-      "expected_output": "Draft 场景在同一 PR 修订 Spec 并继续等待 Ready；trusted 场景可省略方案确认并直接使用非 Draft PR，但仍执行完整范围、Gate、独立验证并等待人工合并。",
+      "prompt": "Issue #42 是一种已经固定并准备扩规模的需求。仓库默认分支已有用户通过普通 PR 合并的 `.factory/patterns/add-export.json`，其中 `enabled: true`、激活标签为 `factory:pattern:add-export`，Issue 恰好带这个标签。请说明如何推进到 verified PR；不要访问真实 GitHub，只输出 pattern-run.md。",
+      "expected_output": "显式启用且被唯一标签选中的 Pattern 可省略逐 Issue Spec/Ready，但仍需原子认领、路径与不变量约束、Gate、独立验证和人工合并。",
       "files": [],
       "expectations": [
-        "Draft 场景读取普通评论并在同一 PR 修订 design.md 与 factory.json，不创建第二个 PR",
-        "Draft 场景不会开始实现，也不会替人点击 Ready for review",
-        "trusted 场景只省略 Spec 人工确认，不省略确定性 Gate、独立验证或人工合并",
-        "trusted 场景不要求人类再做一次 Ready 操作，PR 应由方案阶段直接创建为非 Draft",
-        "输出把 GitHub Issue、PR、时间线和 Checks 作为恢复来源，而不是依赖 Agent 会话",
-        "输出不引入 QUEUE、STATE、runs 流水账或按行数限制范围"
+        "已合并且 enabled 的 Pattern 与 Issue 唯一匹配标签共同构成执行授权",
+        "首次写仓库前以 Issue 编号、唯一运行 ID 和精确标题运行 claim.sh，并复用确定性分支和唯一 PR",
+        "Pattern 本身是本次执行的方案权威，因此直接实现且不等待逐 Issue Ready for review",
+        "所有改动必须在 Pattern allowedPaths 内并保持 preserved 不变量，且 Pattern 不能授权修改 Factory 治理文件",
+        "仍运行规定 Gate 并由隔离的新 Agent 上下文独立验证当前 SHA",
+        "Pattern 权限变化使用独立人工评审 PR，最终产品 PR 仍由人类合并",
+        "回答使用运行器无关的 Agent 角色描述流程"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "标题为 `Fix export timeout handling` 的 Issue #77 可执行，一个定时任务和一个手工 Agent 会话在各自独立 worktree 中同时发现它，远端还没有对应分支或 PR。请说明双方如何避免重复推进；不要访问真实 GitHub，只输出 concurrency.md。",
+      "expected_output": "双方都用 Issue 编号与同一精确标题生成同一个可读确定性分支并做非强推原子认领，首次成功者继续，失败者恢复胜出运行或停止。",
+      "files": [],
+      "expectations": [
+        "双方都在首次写仓库前用相同精确标题调用 claim.sh，并使用同一 issue/77-fix-export-timeout-handling 分支名",
+        "以首次非强推成功作为唯一认领结果，不把 GitHub 标签当锁",
+        "CLAIMED 的运行继续，EXISTS 或 LOST 的运行查找并恢复已有分支或唯一 PR，否则结束",
+        "失败方不创建替代分支、第二个 PR，不强推，也不继续并行实现",
+        "GitHub 远端分支与唯一 PR 是并发后的恢复来源",
+        "分支使用通用的 issue/ 前缀和标题 slug"
       ]
     }
   ]

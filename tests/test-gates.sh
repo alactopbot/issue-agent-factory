@@ -41,4 +41,24 @@ red_output="$(cd "$fixture" && ./.factory/scripts/gates.sh full 2>&1)"; red_stat
 set -e
 [ "$red_status" -eq 1 ]
 printf '%s' "$red_output" | grep -q 'status=RED'
+
+write_package true
+printf '%s\n' \
+  'REQUIRED_FAST=""' \
+  'REQUIRED_FULL=""' \
+  'REQUIRED_DEEP="architecture"' \
+  'ARCHITECTURE_COMMAND=""' > "$fixture/.factory/gates.conf"
+set +e
+architecture_output="$(cd "$fixture" && ./.factory/scripts/gates.sh deep 2>&1)"; architecture_status=$?
+set -e
+[ "$architecture_status" -eq 2 ]
+printf '%s' "$architecture_output" | grep -q 'misconfigured=architecture'
+
+printf '%s\n' \
+  'REQUIRED_FAST=""' \
+  'REQUIRED_FULL=""' \
+  'REQUIRED_DEEP="architecture"' \
+  'ARCHITECTURE_COMMAND="true"' > "$fixture/.factory/gates.conf"
+architecture_green="$(cd "$fixture" && ./.factory/scripts/gates.sh deep)"
+printf '%s' "$architecture_green" | grep -q 'status=GREEN'
 echo "gates: ok"

@@ -5,9 +5,7 @@ import process from "node:process";
 
 const trustedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const trustedPermissions = new Set(["admin", "maintain", "write"]);
-const protectedPlanPaths = [
-  /^docs\/requirements\/REQ-[^/]+\/design\.md$/,
-  /^docs\/requirements\/REQ-[^/]+\/factory\.json$/,
+const governancePaths = [
   /^\.factory\/patterns\//,
   /^\.factory\/project\.json$/,
   /^\.factory\/(?:gates\.conf|.*\.schema\.json|scripts\/|hooks\/)/,
@@ -16,6 +14,10 @@ const protectedPlanPaths = [
   /^\.github\/workflows\/factory-gates\.yml$/,
   /^AGENTS\.md$/,
   /^docs\/factory\/(?:CHARTER|CONTRACT)\.md$/,
+];
+const approvalBoundPaths = [
+  /^docs\/requirements\/REQ-[^/]+\/design\.md$/,
+  ...governancePaths,
 ];
 const fieldLine = /^([a-z_]+):\s*(.+)$/;
 
@@ -71,72 +73,94 @@ function pathMatches(pattern, path) {
   return new RegExp(`${source}$`).test(path);
 }
 
+function matchesAny(patterns, path) {
+  return patterns.some((pattern) => pattern.test(path));
+}
+
+function deliveryEvidencePath(issueNumber, path) {
+  const prefix = requirementId(issueNumber);
+  return new RegExp(`^docs/requirements/${prefix}-[^/]+/delivery\\.md$`).test(path);
+}
+
+function validPattern(pattern, issueLabels) {
+  if (!pattern || typeof pattern !== "object") return false;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pattern.id ?? "")) return false;
+  if (!Number.isInteger(pattern.version) || pattern.version < 1 || pattern.enabled !== true) return false;
+  if (pattern.activation?.issueLabel !== `factory:pattern:${pattern.id}`) return false;
+  if (!issueLabels.includes(pattern.activation.issueLabel)) return false;
+  if (!Array.isArray(pattern.scope?.allowedPaths) || pattern.scope.allowedPaths.length === 0) return false;
+  if (!Array.isArray(pattern.scope?.preserved) || pattern.scope.preserved.length === 0) return false;
+  return pattern.execution?.planReview === "none" &&
+    ["fast", "full", "deep"].includes(pattern.execution?.gateLevel) &&
+    pattern.execution?.independentVerification === "required" &&
+    pattern.execution?.completion === "verified-pr";
+}
+
 export function validateGateContext(context) {
   const errors = [];
-  const { pr, issue, issueComments, prComments, specTransitions, openLinkedPrs, comparisons, spec } = context;
+  const {
+    pr, issue, issueComments, prComments, specTransitions, openLinkedPrs,
+    comparisons, pattern, hasReviewedSpec,
+  } = context;
 
   if (pr.state !== "OPEN") errors.push("pr:not-open");
   if (issue.state && issue.state !== "OPEN") errors.push("issue:not-open");
   if (openLinkedPrs.length !== 1 || openLinkedPrs[0] !== pr.number) errors.push("pr:not-unique-open");
 
-  const handoff = latestMarker(issueComments, "factory-handoff");
-  if (!handoff || !trusted(handoff.item)) {
+  const handoff = latestMarker(issueComments, "factory-handoff", (_fields, item) => trusted(item));
+  if (!handoff) {
     errors.push("handoff:missing-or-untrusted");
     return { ok: false, errors };
   }
 
   if (handoff.fields.requirement !== requirementId(issue.number)) errors.push("handoff:requirement-mismatch");
-  if (Number(handoff.fields.review_pr) !== pr.number) errors.push("handoff:review-pr-mismatch");
 
-  if (!spec || spec.requirement !== requirementId(issue.number) || spec.issue !== issue.number) {
-    errors.push("spec:missing-or-mismatched-manifest");
-  } else {
-    if (spec.schemaVersion !== 1) errors.push("spec:unsupported-schema-version");
-    if (!["bootstrap", "supervised", "trusted", "autonomous"].includes(spec.mode)) errors.push("spec:invalid-mode");
-    if (!["fast", "full", "deep"].includes(spec.gateLevel)) errors.push("spec:invalid-gate-level");
-    if (typeof spec.pattern !== "string" || !spec.pattern.trim()) errors.push("spec:invalid-pattern");
-    if (spec.reviewPr !== pr.number) errors.push("spec:review-pr-mismatch");
-    if (!Array.isArray(spec.allowedPaths) || !Array.isArray(spec.humanGates)) {
-      errors.push("spec:invalid-manifest");
+  const patternLabels = (issue.labels ?? []).filter((label) => label.startsWith("factory:pattern:"));
+  if (patternLabels.length > 1) errors.push("pattern:multiple-activation-labels");
+  const patternRun = patternLabels.length === 1;
+
+  if (patternRun) {
+    if (!validPattern(pattern, issue.labels ?? [])) {
+      errors.push("pattern:missing-disabled-or-invalid");
     } else {
+      if (handoff.fields.pattern !== pattern.id) errors.push("handoff:pattern-mismatch");
       for (const path of pr.changedFiles) {
-        if (!spec.allowedPaths.some((pattern) => pathMatches(pattern, path))) errors.push(`scope:not-allowed:${path}`);
-      }
-    }
-
-    if (Array.isArray(spec.humanGates) &&
-        pr.changedFiles.some((path) => protectedPlanPaths.some((pattern) => pattern.test(path))) &&
-        !spec.humanGates.includes("spec-ready")) {
-      errors.push("governance:human-spec-ready-required");
-    }
-
-    if (Array.isArray(spec.humanGates) && spec.humanGates.includes("spec-ready")) {
-      const transition = specTransitions
-        .filter((item) => ["ready_for_review", "convert_to_draft"].includes(item.event))
-        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-        .at(-1);
-      if (!transition) {
-        errors.push("spec-ready:missing");
-      } else if (transition.event === "convert_to_draft" || pr.isDraft) {
-        errors.push("spec-ready:pr-is-draft");
-      } else if (!trusted(transition)) {
-        errors.push("spec-ready:untrusted-actor");
-      } else if (!isFullSha(transition.commitId ?? transition.runHeadSha)) {
-        errors.push("spec-ready:invalid-sha");
-      } else if (!transition.url || (!transition.commitId && !transition.runUrl)) {
-        errors.push("spec-ready:missing-source");
-      } else {
-        const approvedSha = transition.commitId ?? transition.runHeadSha;
-        if (handoff.fields.approved_plan_sha !== approvedSha) errors.push("handoff:approved-plan-sha-mismatch");
-        const comparison = comparisons[approvedSha];
-        if (!comparison || !comparison.ancestorOfHead) {
-          errors.push("spec-ready:sha-not-in-pr-history");
-        } else if (comparison.changedFiles.some((path) => protectedPlanPaths.some((pattern) => pattern.test(path)))) {
-          errors.push("spec-ready:spec-drift");
+        if (matchesAny(governancePaths, path)) {
+          errors.push(`governance:pattern-cannot-authorize:${path}`);
+        } else if (!deliveryEvidencePath(issue.number, path) &&
+                   !pattern.scope.allowedPaths.some((allowed) => pathMatches(allowed, path))) {
+          errors.push(`pattern:not-allowed:${path}`);
         }
       }
-    } else if (pr.isDraft) {
-      errors.push("spec:automatic-mode-still-draft");
+    }
+    if (pr.isDraft) errors.push("pattern:pr-is-draft");
+  } else {
+    if (pattern) errors.push("pattern:configuration-without-activation-label");
+    if (handoff.fields.pattern && handoff.fields.pattern !== "none") errors.push("handoff:unexpected-pattern");
+    if (!hasReviewedSpec) errors.push("spec:design-missing");
+
+    const transition = specTransitions
+      .filter((item) => ["ready_for_review", "convert_to_draft"].includes(item.event))
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+      .at(-1);
+    if (!transition) {
+      errors.push("spec-ready:missing");
+    } else if (transition.event === "convert_to_draft" || pr.isDraft) {
+      errors.push("spec-ready:pr-is-draft");
+    } else if (!trusted(transition)) {
+      errors.push("spec-ready:untrusted-actor");
+    } else if (!isFullSha(transition.commitId ?? transition.runHeadSha)) {
+      errors.push("spec-ready:invalid-sha");
+    } else if (!transition.url || (!transition.commitId && !transition.runUrl)) {
+      errors.push("spec-ready:missing-source");
+    } else {
+      const approvedSha = transition.commitId ?? transition.runHeadSha;
+      const comparison = comparisons[approvedSha];
+      if (!comparison || !comparison.ancestorOfHead) {
+        errors.push("spec-ready:sha-not-in-pr-history");
+      } else if (comparison.changedFiles.some((path) => matchesAny(approvalBoundPaths, path))) {
+        errors.push("spec-ready:spec-drift");
+      }
     }
   }
 
@@ -232,6 +256,18 @@ async function liveContext(event, token, repository) {
     .filter((candidate) => linkedIssueNumber(candidate.body ?? "") === issueNumber)
     .map((candidate) => candidate.number);
 
+  const issueLabels = issue.labels.map((label) => label.name);
+  const patternLabels = issueLabels.filter((label) => label.startsWith("factory:pattern:"));
+  let pattern = null;
+  if (patternLabels.length === 1) {
+    const patternId = patternLabels[0].slice("factory:pattern:".length);
+    try {
+      pattern = JSON.parse(await readFile(`.factory/patterns/${patternId}.json`, "utf8"));
+    } catch {
+      pattern = null;
+    }
+  }
+
   const rawTransitions = timeline.filter((item) => ["ready_for_review", "convert_to_draft"].includes(item.event));
   const readyRuns = new Map();
   for (const transition of rawTransitions.filter((item) => item.event === "ready_for_review")) {
@@ -271,9 +307,10 @@ async function liveContext(event, token, repository) {
     throw new Error(`Multiple requirement directories match ${requirementPrefix}`);
   }
   const requirementDirectory = matchingRequirementDirectories[0];
-  const spec = requirementDirectory
-    ? JSON.parse(await readFile(`docs/requirements/${requirementDirectory.name}/factory.json`, "utf8"))
-    : null;
+  const requirementFiles = requirementDirectory
+    ? await readdir(`docs/requirements/${requirementDirectory.name}`)
+    : [];
+  const hasReviewedSpec = requirementFiles.includes("design.md");
   return {
     pr: {
       number: pr.number,
@@ -283,7 +320,7 @@ async function liveContext(event, token, repository) {
       labels: pr.labels.map((label) => label.name),
       changedFiles: prFiles.map((file) => file.filename),
     },
-    issue: { number: issue.number, state: issue.state.toUpperCase() },
+    issue: { number: issue.number, state: issue.state.toUpperCase(), labels: issueLabels },
     issueComments: issueComments.map(normalizeComment),
     prComments: prComments.map(normalizeComment),
     specTransitions: rawTransitions.map((transition) => ({
@@ -297,7 +334,8 @@ async function liveContext(event, token, repository) {
     })),
     openLinkedPrs,
     comparisons,
-    spec,
+    pattern,
+    hasReviewedSpec,
   };
 }
 

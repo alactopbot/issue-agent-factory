@@ -1,13 +1,20 @@
 ---
 name: factory-status
-description: 从 GitHub Issue、PR、时间线、Checks 和 Factory 证据生成只读状态报告，突出当前需要人的方案或合并决定。用于 status、next、queue、stuck 或指定 Issue 查询。
+description: Produce a read-only Factory control-room report from live GitHub Issues, deterministic branches, pull requests, review transitions, Patterns, and Checks. Use for status, next-work, queue, bottleneck, or stuck-Issue questions; never mutate workflow state.
 ---
 
-# Factory 状态
+# Factory status
 
-读取契约、章程、项目配置、Pattern，并查询开放 Issue、唯一 PR、Draft/Ready 时间线、评论、Checks、
-`factory-verification` 与 `factory-delivery`。只报告，不修改标签、不批准、不关闭、不合并。
+Use GitHub live state as the source of truth. Do not modify labels, comments, branches, pull requests, Patterns, or files.
 
-按项目配置的工作语言依次报告：当前需要人在 GitHub 做的 Spec 反馈、Ready 或最终合并；等待人工决定
-数量与背压；各状态需求数量和链接；默认分支与 PR Gate 健康；Pattern 成熟度与降级信号；最有价值的
-下一步。数据不足时明确写“不足以判断”，不得从缺少评论或 Check 推断成功。
+Report in the project's workflow language, in this order:
+
+1. Draft Specs awaiting human feedback or Ready;
+2. verified pull requests awaiting human merge;
+3. explicitly authorized Pattern work in progress;
+4. ordinary implementation work in progress;
+5. stale or inconsistent claim branches;
+6. counts by Factory state, default-branch Gate health, and the highest-value next action.
+
+Include links and the evidence behind each stalled classification. When data is missing, say that the state cannot be
+determined; absence of a comment, Check, or recent commit is not evidence of success.
