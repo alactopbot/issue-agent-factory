@@ -32,7 +32,14 @@ selects it. Triage consumes that authority; changes to it use a separate reviewe
 
 ## Publish the handoff
 
-Apply exactly one Factory state label and create or update one trusted Issue comment:
+Apply exactly one Factory state label with the state script, then create or update one trusted Issue comment:
+
+```bash
+./.factory/scripts/set-issue-state.sh <issue-number> <ready-to-spec|ready-to-implement|needs-info>
+```
+
+Do not add or remove Factory state labels directly. Complete the classification and missing-decision check before invoking
+the script, so a known blocker goes directly to `needs-info` without a transient `in-progress` state.
 
 ```text
 <!-- factory-handoff -->

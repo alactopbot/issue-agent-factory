@@ -22,6 +22,7 @@ required_files=(
   .factory/scripts/claim.sh
   .factory/scripts/gates.sh
   .factory/scripts/prove-test.sh
+  .factory/scripts/set-issue-state.sh
   .factory/scripts/validate-pr-state.mjs
   .factory/hooks/block-merge.sh
   .codex/hooks.json

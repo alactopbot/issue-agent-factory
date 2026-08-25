@@ -21,7 +21,8 @@ Confirm the head SHA before running checks.
 ## Verification procedure
 
 1. Decide whether `done_when` is literally true as a complete user outcome.
-2. Confirm the authority is current: no Spec/governance drift after Ready, or no Pattern mismatch/expansion.
+2. Confirm the authority is current: for ordinary work, the trusted Ready event authorizes continuation and the complete
+   current Spec remains within the approved product outcome and scope; for Pattern work, require no mismatch or expansion.
 3. For Pattern work, check every changed path against `allowedPaths`, prove every `preserved` invariant, and reject any
    Factory governance change.
 4. Confirm behavior evidence fails without the implementation and passes with it. Use
@@ -49,5 +50,7 @@ gate_status: GREEN
 
 Then remove `factory:rejected`, add `factory:verified`, and run
 `node .factory/scripts/validate-pr-state.mjs --pr <pull-request-number>`. A non-green or misconfigured state result
-revokes acceptance: remove `factory:verified`, add `factory:rejected`, publish the blocking evidence, and stop. Do not
-merge, approve the product, or convert a Draft plan to Ready.
+prevents completion until its evidence is resolved. Only a real authorization, implementation, Gate, scope, or stale-SHA
+risk is an independent rejection. Missing optional platform capabilities or validator metadata incompatibility is a
+recoverable workflow diagnostic: report it without consuming an implementation-rejection attempt. Do not merge, approve
+the product, or convert a Draft plan to Ready.

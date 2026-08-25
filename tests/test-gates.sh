@@ -22,6 +22,26 @@ write_package true
 green_output="$(cd "$fixture" && ./.factory/scripts/gates.sh full)"
 printf '%s' "$green_output" | grep -q 'status=GREEN'
 
+# Deep gates must not invoke registry-backed dependency audits. Repositories may
+# still expose their own audit command for an explicit, on-demand security check.
+real_npm="$(command -v npm)"
+fake_bin="$fixture/fake-bin"
+audit_marker="$fixture/audit-ran"
+mkdir -p "$fake_bin"
+printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = "audit" ]; then' \
+  '  : > "$AUDIT_MARKER"' \
+  '  exit 91' \
+  'fi' \
+  'exec "$REAL_NPM" "$@"' > "$fake_bin/npm"
+chmod +x "$fake_bin/npm"
+printf '%s\n' '{"name":"gate-fixture","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{}}' > "$fixture/package-lock.json"
+deep_output="$(cd "$fixture" && PATH="$fake_bin:$PATH" REAL_NPM="$real_npm" AUDIT_MARKER="$audit_marker" ./.factory/scripts/gates.sh deep)"
+printf '%s' "$deep_output" | grep -q 'status=GREEN'
+[ ! -e "$audit_marker" ]
+rm -f "$fixture/package-lock.json"
+
 sed -i.bak -e 's/default: full/default: fast/' "$fixture/docs/factory/CHARTER.md"
 rm -f "$fixture/docs/factory/CHARTER.md.bak"
 default_output="$(cd "$fixture" && ./.factory/scripts/gates.sh)"

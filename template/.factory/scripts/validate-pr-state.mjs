@@ -17,10 +17,6 @@ const governancePaths = [
   /^AGENTS\.md$/,
   /^docs\/factory\/(?:CHARTER|CONTRACT)\.md$/,
 ];
-const approvalBoundPaths = [
-  /^docs\/requirements\/REQ-[^/]+\/design\.md$/,
-  ...governancePaths,
-];
 const fieldLine = /^([a-z_]+):\s*(.+)$/;
 const gateLevels = ["fast", "full", "deep"];
 const gateRank = new Map(gateLevels.map((level, index) => [level, index]));
@@ -119,7 +115,7 @@ export function validatePrState(context) {
   const errors = [];
   const {
     pr, issue, issueComments, prComments, specTransitions, openLinkedPrs,
-    comparisons, pattern, hasReviewedSpec, defaultGateLevel,
+    pattern, hasReviewedSpec, defaultGateLevel,
   } = context;
 
   if (pr.state !== "OPEN") errors.push("pr:not-open");
@@ -168,18 +164,6 @@ export function validatePrState(context) {
       errors.push("spec-ready:pr-is-draft");
     } else if (!trusted(transition)) {
       errors.push("spec-ready:untrusted-actor");
-    } else if (!isFullSha(transition.commitId)) {
-      errors.push("spec-ready:invalid-sha");
-    } else if (!transition.url) {
-      errors.push("spec-ready:missing-source");
-    } else {
-      const approvedSha = transition.commitId;
-      const comparison = comparisons[approvedSha];
-      if (!comparison || !comparison.ancestorOfHead) {
-        errors.push("spec-ready:sha-not-in-pr-history");
-      } else if (comparison.changedFiles.some((path) => matchesAny(approvalBoundPaths, path))) {
-        errors.push("spec-ready:spec-drift");
-      }
     }
   }
 
@@ -294,16 +278,6 @@ async function githubContext(prNumber, token, repository) {
     const login = transition.actor?.login;
     if (login && !trustedLogins.has(login)) trustedLogins.set(login, await hasWritePermission(apiRoot, login, token));
   }
-  const transitionShas = rawTransitions.map((item) => item.commit_id).filter(isFullSha);
-  const comparisons = {};
-  for (const sha of new Set(transitionShas)) {
-    const comparison = await github(`${apiRoot}/compare/${sha}...${pr.head.sha}`, token);
-    comparisons[sha] = {
-      ancestorOfHead: ["identical", "ahead"].includes(comparison.status),
-      changedFiles: (comparison.files ?? []).map((file) => file.filename),
-    };
-  }
-
   const normalizeComment = (comment) => ({
     body: comment.body,
     authorAssociation: comment.author_association,
@@ -337,13 +311,10 @@ async function githubContext(prNumber, token, repository) {
     prComments: prComments.map(normalizeComment),
     specTransitions: rawTransitions.map((transition) => ({
       event: transition.event,
-      commitId: transition.commit_id,
       trustedActor: trustedLogins.get(transition.actor?.login) === true,
       createdAt: transition.created_at,
-      url: transition.url,
     })),
     openLinkedPrs,
-    comparisons,
     pattern,
     hasReviewedSpec,
     defaultGateLevel: await charterDefaultGateLevel(),

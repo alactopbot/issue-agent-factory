@@ -63,6 +63,7 @@ if [ "$DRY" -eq 0 ]; then
     .factory/scripts/doctor.sh \
     .factory/scripts/gates.sh \
     .factory/scripts/prove-test.sh \
+    .factory/scripts/set-issue-state.sh \
     .factory/scripts/validate-pr-state.mjs; do
     chmod +x "$TARGET/$path" 2>/dev/null || true
   done

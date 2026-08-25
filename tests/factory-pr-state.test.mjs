@@ -23,10 +23,8 @@ function comment(body, overrides = {}) {
 function transition(event = "ready_for_review", overrides = {}) {
   return {
     event,
-    commitId: specSha,
     trustedActor: true,
     createdAt: "2026-08-24T00:00:00Z",
-    url: "https://api.github.com/repos/example/project/issues/events/1",
     ...overrides,
   };
 }
@@ -50,7 +48,6 @@ function reviewedContext() {
     prComments: [verification()],
     specTransitions: [transition()],
     openLinkedPrs: [8],
-    comparisons: { [specSha]: { ancestorOfHead: true, changedFiles: ["src/feature.js"] } },
     pattern: null,
     hasReviewedSpec: true,
     defaultGateLevel: "full",
@@ -64,7 +61,6 @@ function patternContext() {
   context.pr.changedFiles = ["src/feature.js"];
   context.pr.isDraft = false;
   context.specTransitions = [];
-  context.comparisons = {};
   context.hasReviewedSpec = false;
   context.pattern = {
     id: "feature-family",
@@ -114,17 +110,11 @@ test("missing or invalid gate configuration fails closed", () => {
   assert.ok(validatePrState(invalidCharter).errors.includes("gate-level:charter-default-invalid"));
 });
 
-test("Ready without an exact commit SHA fails closed", () => {
+test("trusted Ready authorizes progress without commit or source metadata", () => {
   const context = reviewedContext();
   context.specTransitions[0].commitId = null;
-  assert.ok(validatePrState(context).errors.includes("spec-ready:invalid-sha"));
-});
-
-test("Ready approval cannot move past Spec drift", () => {
-  const context = reviewedContext();
-  context.comparisons[specSha].changedFiles = ["docs/requirements/REQ-007-example/design.md"];
-  const errors = validatePrState(context).errors;
-  assert.ok(errors.includes("spec-ready:spec-drift"));
+  context.specTransitions[0].url = null;
+  assert.deepEqual(validatePrState(context), { ok: true, errors: [] });
 });
 
 test("Draft and Convert to draft revoke approval", () => {

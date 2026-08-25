@@ -29,4 +29,5 @@ over a claim branch, create or widen a Pattern, implement a finding, merge, or p
 specific recoverable finding and stop.
 
 A trusted Ready transition makes replacing `factory:wait-to-implement` with `factory:ready-to-implement` on the Issue an
-unambiguous repair. Do not perform it without a current, trusted Ready transition.
+unambiguous repair. Do not perform it without a current, trusted Ready transition. For this or any other unambiguous state
+repair, run `./.factory/scripts/set-issue-state.sh <issue-number> <state>`; never add or remove Factory state labels directly.

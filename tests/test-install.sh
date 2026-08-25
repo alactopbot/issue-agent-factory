@@ -14,6 +14,7 @@ for path in \
   .factory/pattern.schema.json \
   .factory/scripts/claim.sh \
   .factory/scripts/gates.sh \
+  .factory/scripts/set-issue-state.sh \
   .factory/scripts/validate-pr-state.mjs \
   .factory/hooks/block-merge.sh \
   .codex/hooks.json \
@@ -23,6 +24,7 @@ for path in \
 done
 
 [ -x "$fixture/.factory/scripts/claim.sh" ]
+[ -x "$fixture/.factory/scripts/set-issue-state.sh" ]
 [ -x "$fixture/.factory/scripts/validate-pr-state.mjs" ]
 [ ! -e "$fixture/.github/workflows" ]
 [ ! -e "$fixture/.factory/scripts/ci-setup.sh" ]

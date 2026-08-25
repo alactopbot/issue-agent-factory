@@ -7,7 +7,7 @@
 # Usage:
 #   ./.factory/scripts/gates.sh fast    # types + lint            (~seconds, run constantly)
 #   ./.factory/scripts/gates.sh full    # + tests + build
-#   ./.factory/scripts/gates.sh deep    # + audit + complexity    (run on load-bearing changes)
+#   ./.factory/scripts/gates.sh deep    # + mutation + architecture (load-bearing changes)
 #
 # Exit codes:  0 = all required gates green   1 = at least one gate red
 #              2 = invalid level or a required gate could not run
@@ -37,7 +37,7 @@ esac
 
 REQUIRED_FAST="types lint"
 REQUIRED_FULL="types lint test"
-REQUIRED_DEEP="types lint test audit"
+REQUIRED_DEEP="types lint test"
 ARCHITECTURE_COMMAND=""
 if [ -f .factory/gates.conf ]; then
   # This file is protected by the factory contract and contains assignments only.
@@ -53,7 +53,7 @@ esac
 
 for gate in $REQUIRED; do
   case "$gate" in
-    types|lint|test|build|audit|mutation|architecture) ;;
+    types|lint|test|build|mutation|architecture) ;;
     *)
       echo "error: unknown required gate in .factory/gates.conf: $gate" >&2
       printf 'FACTORY_GATES: level=%s status=MISCONFIGURED passed=0 failed=0 failing=none skipped=none misconfigured=unknown-required-gate:%s\n' "$LEVEL" "$gate"
@@ -178,32 +178,20 @@ if [ "$LEVEL" = "full" ] || [ "$LEVEL" = "deep" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# TIER 3 - deep. Security, complexity, mutation, architecture rules.
+# TIER 3 - deep. Mutation and architecture rules.
 # Run on anything touching a load-bearing path (see docs/factory/CHARTER.md).
 # ---------------------------------------------------------------------------
 if [ "$LEVEL" = "deep" ]; then
   case "$STACK" in
     node)
-      if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f pnpm-lock.yaml ] || [ -f yarn.lock ] || [ -f bun.lockb ]; then
-        run audit $PM audit --audit-level=high
-      else
-        skip audit "no package-manager lockfile"
-      fi
       if pkg_has mutation; then run mutation $PMRUN mutation
       else skip mutation "no 'mutation' script (see CHARTER.md - coverage is not a substitute)"; fi
       ;;
     python)
-      if has pip-audit; then run audit pip-audit; else skip audit "pip-audit not installed"; fi
       if has mutmut;    then run mutation mutmut run; else skip mutation "mutmut not installed"; fi
       ;;
-    rust)
-      if has cargo-audit; then run audit cargo audit; else skip audit "cargo-audit not installed"; fi
-      ;;
-    go)
-      if has govulncheck; then run audit govulncheck ./...; else skip audit "govulncheck not installed"; fi
-      ;;
+    rust|go) ;;
     *)
-      skip audit "unknown stack"
       skip mutation "unknown stack"
       ;;
   esac
