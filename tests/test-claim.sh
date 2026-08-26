@@ -9,6 +9,7 @@ git init -q --bare "$fixture/remote.git"
 git clone -q "$fixture/remote.git" "$fixture/seed" 2>/dev/null
 git -C "$fixture/seed" config user.email factory-test@example.com
 git -C "$fixture/seed" config user.name "Factory Test"
+git -C "$fixture/seed" switch -q -c main
 printf 'base\n' > "$fixture/seed/README.md"
 git -C "$fixture/seed" add README.md
 git -C "$fixture/seed" commit -qm base
@@ -45,15 +46,5 @@ existing_status=$?
 set -e
 [ "$existing_status" -eq 3 ]
 printf '%s' "$existing_issue" | grep -q 'status=EXISTS branch=issue/143'
-
-# Updating an existing installation must recognize an in-flight legacy branch
-# rather than creating a second stable claim for the same Issue.
-git -C "$fixture/seed" push -q origin main:issue/144-legacy-title
-set +e
-legacy_issue="$(cd "$fixture/runner-a" && git switch -q main && "$ROOT/template/.factory/scripts/claim.sh" 144 runner-a 2>&1)"
-legacy_status=$?
-set -e
-[ "$legacy_status" -eq 3 ]
-printf '%s' "$legacy_issue" | grep -q 'status=EXISTS branch=issue/144-legacy-title'
 
 echo "claim: ok"

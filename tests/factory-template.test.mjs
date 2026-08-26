@@ -12,96 +12,56 @@ async function filesUnder(relative) {
   return entries.filter((entry) => entry.isFile()).map((entry) => path.join(entry.parentPath, entry.name));
 }
 
-test("installed workflow has one portable canonical layout", async () => {
+test("installed workflow contains only the main runner and verifier", async () => {
   const files = await filesUnder("template/");
-  const text = (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
-  assert.equal(files.filter((file) => file.endsWith("/AGENTS.md")).length, 1);
-  assert.equal(files.filter((file) => /\/\.agents\/skills\/factory-[^/]+\/SKILL\.md$/.test(file)).length, 7);
-  assert.equal(files.filter((file) => file.endsWith("/docs/factory/CONTRACT.md")).length, 1);
-  assert.equal(files.some((file) => /\/\.factory\/project(?:\.schema)?\.json$/.test(file)), false);
-  assert.doesNotMatch(text, /factory:plan-review|delivery\.md|validate-pr-gates/);
+  const skills = files.filter((file) => /\/\.agents\/skills\/factory-[^/]+\/SKILL\.md$/.test(file));
+  assert.equal(skills.length, 2);
+  assert.ok(skills.some((file) => file.endsWith("/factory-run/SKILL.md")));
+  assert.ok(skills.some((file) => file.endsWith("/factory-verify/SKILL.md")));
+  assert.equal(files.some((file) => file.includes("/.factory/pattern")), false);
+  assert.equal(files.some((file) => file.endsWith("/prove-test.sh")), false);
+  assert.equal(files.some((file) => file.endsWith("/sync-default-branch.sh")), false);
 });
 
-test("AGENTS and every Factory skill are complete, portable, and runtime-neutral", async () => {
-  const names = ["triage", "spec", "implement", "verify", "monitor", "status", "tune"];
-  const agents = await read("template/AGENTS.md");
-  assert.doesNotMatch(agents, /Codex|Claude|OpenAI|Anthropic/i);
-  for (const name of names) {
-    const skill = await read(`template/.agents/skills/factory-${name}/SKILL.md`);
-    assert.match(skill, /^---\nname: factory-/);
-    assert.doesNotMatch(skill, /Codex|Claude|OpenAI|Anthropic|\.claude/i);
-  }
-  assert.match(await read("template/.agents/skills/factory-spec/SKILL.md"), /Ready for review/);
-  const implement = await read("template/.agents/skills/factory-implement/SKILL.md");
-  const verify = await read("template/.agents/skills/factory-verify/SKILL.md");
-  assert.match(implement, /fresh independent Agent context/);
-  assert.match(implement, /claim\.sh <issue-number> <unique-run-id>/);
-  assert.doesNotMatch(implement, /factory:plan-review|exact Issue title/);
-  assert.match(verify, /remove any existing\s+`factory:verified` label/);
-  assert.match(verify, /gate_level: <level actually run: fast \| full \| deep>/);
-  assert.match(verify, /gate_status: GREEN/);
-  assert.match(verify, /governance changes use `deep`/);
-  assert.match(verify, /Pattern uses its exact configured level/);
-});
-
-test("framework has no project business residue or line-count policy", async () => {
-  const files = await filesUnder("template/");
-  const text = (await Promise.all(files.filter((file) => /\.(md|json|mjs|sh|yml)$/.test(file)).map((file) => readFile(file, "utf8")))).join("\n");
-  assert.doesNotMatch(text, /\bDUN\b|triceratops|stegosaurus|animal-exhibit|museum|恐龙|三角龙|剑龙/i);
-  assert.doesNotMatch(text, /300\s*行|900\s*行|lineBudget|line limit|文件数上限|代码行数上限/i);
-});
-
-test("policy preserves one requirement, one PR and human merge", async () => {
+test("the contract defines exactly the minimal Spec delivery chain", async () => {
   const contract = await read("template/docs/factory/CONTRACT.md");
-  assert.match(contract, /一个用户可独立验收的完整需求对应一个 Issue、一个分支和一个 PR/);
-  assert.match(contract, /<!-- factory-handoff -->/);
+  assert.match(contract, /Issue[\s\S]*scheduler scan[\s\S]*atomic issue\/<number> branch[\s\S]*Spec[\s\S]*Draft PR[\s\S]*Ready for review[\s\S]*implementation[\s\S]*verification[\s\S]*human merge/);
+  assert.match(contract, /one Issue,[\s\S]*one deterministic branch,[\s\S]*one Spec, and one pull request/);
   assert.match(contract, /<!-- factory-verification -->/);
-  assert.match(contract, /最终合并代表产品验收/);
-  assert.match(contract, /普通评论/);
-  assert.doesNotMatch(contract, /Review changes|结构化人工评论/);
+  assert.doesNotMatch(contract, /factory-handoff|Pattern|fast \| full \| deep|factory:verified|factory:rejected/);
 });
 
-test("Patterns have an explicit user-controlled activation contract", async () => {
-  const schema = await read("template/.factory/pattern.schema.json");
-  const parsed = JSON.parse(schema);
-  const triage = await read("template/.agents/skills/factory-triage/SKILL.md");
-  const guide = await read("template/.factory/patterns/README.md");
-  assert.deepEqual(parsed.required, ["id", "version", "enabled", "activation", "scope", "execution"]);
-  assert.equal(parsed.properties.$schema.const, "../pattern.schema.json");
-  assert.equal(parsed.properties.enabled.type, "boolean");
-  assert.match(parsed.properties.activation.properties.issueLabel.pattern, /factory:pattern:/);
-  assert.match(triage, /user-reviewed configuration is enabled on the default branch/);
-  assert.match(guide, /factory-tune/);
-  assert.match(guide, /不是代码模板、Issue 模板或自动/);
-  assert.match(guide, /不支持变量、捕获组、负向规则/);
-  assert.match(guide, /不能只靠 glob，必须\n由确定性 Gate 检查/);
-  assert.match(guide, /"enabled": false/);
-  assert.match(guide, /独立普通 PR/);
-  assert.match(guide, /递增 `version`/);
-  assert.match(guide, /gh label create "factory:pattern:<id>"/);
+test("the six Issue states are stable and mutually exclusive", async () => {
+  const stateScript = await read("template/.factory/scripts/set-issue-state.sh");
+  const bootstrap = await read("template/.factory/scripts/bootstrap-github.sh");
+  const states = ["spec", "awaiting-spec-review", "implementing", "verifying", "awaiting-merge", "needs-info"];
+  for (const state of states) {
+    assert.match(stateScript, new RegExp(`factory:${state}`));
+    assert.match(bootstrap, new RegExp(`factory:${state}`));
+  }
+  assert.match(bootstrap, /Would delete obsolete labels if present/);
+  assert.match(bootstrap, /factory:pattern:\*/);
 });
 
-test("ordinary requirements use one complete human-readable Spec", async () => {
-  const spec = await read("template/.agents/skills/factory-spec/SKILL.md");
-  assert.match(spec, /design\.md/);
-  assert.match(spec, /design\.md` is the complete plan authority/);
-  assert.match(await read("template/docs/requirements/README.md"), /design\.md/);
-  assert.doesNotMatch(await read("template/docs/requirements/README.md"), /delivery\.md/);
+test("skills preserve human Ready, current-head verification, and human merge", async () => {
+  const run = await read("template/.agents/skills/factory-run/SKILL.md");
+  const verify = await read("template/.agents/skills/factory-verify/SKILL.md");
+  assert.match(run, /claim\.sh <issue-number> <unique-run-id>/);
+  assert.match(run, /trusted Ready authorizes implementation/);
+  assert.match(run, /factory:verifying/);
+  assert.match(verify, /verified_sha: <current full commit SHA>/);
+  assert.match(verify, /factory:awaiting-merge/);
+  assert.match(verify, /Do not merge the PR/);
 });
 
-test("external agents validate PR state without an installed GitHub Actions workflow", async () => {
+test("installed guidance is portable and has no obsolete workflow", async () => {
   const files = await filesUnder("template/");
-  const validator = await read("template/.factory/scripts/validate-pr-state.mjs");
-  assert.equal(files.some((file) => file.includes("/.github/workflows/")), false);
-  assert.match(validator, /--pr <number>/);
-  assert.match(validator, /ghOutput\(\["auth", "token"\]\)/);
-  assert.doesNotMatch(validator, /GITHUB_EVENT_PATH|GITHUB_OUTPUT|actions\/runs/);
-  assert.match(validator, /verification:gate-level-below-required/);
-  assert.match(validator, /verification:gate-not-green/);
-});
-
-test("doctor checks labels with the current GitHub CLI surface", async () => {
-  const doctor = await read("template/.factory/scripts/doctor.sh");
-  assert.match(doctor, /gh label list --limit 1000 --json name/);
-  assert.doesNotMatch(doctor, /gh label view/);
+  const checked = files.filter((file) =>
+    /\.(md|json|mjs|sh)$/.test(file)
+    && !file.endsWith("/bootstrap-github.sh")
+    && !file.endsWith("/set-issue-state.sh"));
+  const text = (await Promise.all(checked.map((file) => readFile(file, "utf8")))).join("\n");
+  assert.doesNotMatch(text, /Codex|Claude|OpenAI|Anthropic|\.claude/i);
+  assert.doesNotMatch(text, /factory-(triage|spec|implement|monitor|status|tune)|factory:pattern:|factory-handoff/);
+  assert.doesNotMatch(text, /300\s*行|900\s*行|lineBudget|line limit|文件数上限|代码行数上限/i);
 });

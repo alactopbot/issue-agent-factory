@@ -15,11 +15,12 @@ product repository.
 
 ## Workflow invariants
 
-- One independently acceptable requirement uses one Issue, one branch, and one pull request.
+- One complete requirement uses one Issue, one branch, and one pull request.
 - Internal work units do not create additional human gates.
 - Scope follows product outcomes and explicit authorization, not line, file, or commit counts.
-- Pattern authority comes from a user-reviewed configuration on the default branch and explicit Issue selection.
-- Agents do not merge or publish.
+- A trusted human Draft-to-Ready transition authorizes implementation.
+- Verification is bound to the current full PR head SHA.
+- Agents do not merge pull requests.
 
 ## Development
 

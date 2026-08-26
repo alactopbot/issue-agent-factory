@@ -1,21 +1,13 @@
 # Issue Agent Factory
 
-面向编码 Agent 的通用 Issue 驱动研发框架。一个用户可独立验收的需求只使用一个 GitHub Issue、一个分支和
-一个 PR；方案、实现、反馈、验证与最终验收都围绕这个 PR 演进。
+一个面向编码 Agent 的最小 GitHub Spec 研发流程：
 
-它解决的不是“让 Agent 多写代码”，而是让新的执行会话或定时任务只凭 GitHub 实时状态就能安全地
-接续工作，同时尽量减少成熟需求模式中的人工介入。
+```text
+Issue -> Scheduler -> atomic branch -> Spec -> Draft review -> Ready -> Implement -> Verify -> Human merge
+```
 
-## 核心体验
-
-1. 用户创建一个描述完整产品结果的 Issue。
-2. 普通需求在唯一 Draft PR 提交统一 Spec；用户显式启用并由 Issue 标签选择的固定 Pattern 直接执行。
-3. 普通方案有问题时保持 Draft 并留评论；通过时点击 **Ready for review**。
-4. Agent 原子认领由 Issue 编号确定的稳定分支，完成整个需求、确定性 Gate 和独立验证。
-5. 人类合并 verified PR，合并本身就是产品验收。
-
-Pattern 是用户通过独立 PR 建设并显式启用的长期授权。固定模式可省略逐 Issue 方案确认，但仍执行
-Gate、独立验证和最终人工合并。
+一个完整需求只使用一个 Issue、确定性分支 `issue/<number>`、一个 Spec 和一个 PR。Spec 与实现使用同一个
+PR：Draft 表示等待方案审核，可信用户点击 Ready 表示允许实现，当前 SHA 验证通过后由人类合并。
 
 ## 安装
 
@@ -25,20 +17,41 @@ cd issue-agent-factory
 ./install.sh /path/to/your-project
 ```
 
-安装器不会覆盖已有文件。然后按 [GETTING_STARTED.md](GETTING_STARTED.md) 配置项目策略、Gate、GitHub
-标签和分支保护。
+在目标项目配置一个现有验证命令：
+
+```bash
+# .factory/gates.conf
+VERIFY_COMMAND="npm test && npm run build"
+
+./.factory/scripts/doctor.sh
+./.factory/scripts/gates.sh
+./.factory/scripts/bootstrap-github.sh --apply
+```
+
+保护 GitHub 默认分支并要求人工合并 PR。
+
+## Scheduler
+
+定时任务使用 `factory-run` 扫描 open Issues，持续推进到人工审核、缺少决定或等待合并。任务需要独立
+checkout、工作区写权限、GitHub 网络访问和已认证的 `gh` 身份。并发任务由 `claim.sh` 的首次非强推成功
+决定胜者。
+
+可以直接使用下面的任务提示词：
+
+```text
+读取 AGENTS.md 和 docs/factory/CONTRACT.md，然后使用 factory-run 扫描 GitHub open Issues。
+推进可执行 Issue，直到遇到人工审核、缺少决定或等待合并。复用 issue/<number> 和唯一 PR。
+Draft PR 只修改 Spec；只有可信用户点击 Ready for review 后才能实现。
+实现完成后运行 factory-verify。不要替人 Ready，不要合并 PR。
+没有可执行工作时只报告简短状态。
+```
 
 ## 目录
 
-- `template/.agents/skills/`：与具体 Agent 运行器无关的完整 Factory skills。
-- `template/.factory/`：Pattern schema、确定性 Gate、PR 状态验证和辅助脚本。
-- `template/docs/factory/`：安装到项目内的人类契约与使用说明。
-- `tests/`：安装、PR 状态、Gate、钩子和文档回归测试。
+- `template/.agents/skills/factory-run/`：Scheduler 和主流程执行入口。
+- `template/.agents/skills/factory-verify/`：验证阶段入口。
+- `template/.factory/scripts/`：原子认领、状态变更、项目 Gate 和最终 PR 状态校验。
+- `template/docs/factory/CONTRACT.md`：安装到目标项目的执行契约。
+- `tests/`：安装、状态、认领和验证测试。
 
-核心契约和 skills 不绑定具体 Agent 产品；当前发行版提供 `.codex/hooks.json` 作为可选运行器适配。相关
-能力可参考：
-[AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)、
-[Build skills](https://learn.chatgpt.com/docs/build-skills)、
-[Scheduled tasks](https://learn.chatgpt.com/docs/automations)。
-
-本项目参考 Addy Osmani 的 Factory 思路，保留原项目 MIT 许可，并提供一套可移植的 Issue/PR 研发协议。
+Factory 不合并 PR。

@@ -57,12 +57,10 @@ done < <(cd "$SRC" && find . -type f | sed 's|^\./||' | sort)
 
 if [ "$DRY" -eq 0 ]; then
   for path in \
-    .factory/hooks/block-merge.sh \
     .factory/scripts/bootstrap-github.sh \
     .factory/scripts/claim.sh \
     .factory/scripts/doctor.sh \
     .factory/scripts/gates.sh \
-    .factory/scripts/prove-test.sh \
     .factory/scripts/set-issue-state.sh \
     .factory/scripts/validate-pr-state.mjs; do
     chmod +x "$TARGET/$path" 2>/dev/null || true
@@ -73,14 +71,14 @@ cat <<'EOF'
 
 下一步：
 
-  1. 填写 docs/factory/CHARTER.md 和 AGENTS.md。
-  2. 按项目调整 .factory/gates.conf。
-  3. 运行 ./.factory/scripts/doctor.sh 和 ./.factory/scripts/gates.sh full。
+  1. 在 .factory/gates.conf 配置一个项目现有的验证命令。
+  2. 按需把 Factory 说明合并到项目已有的 AGENTS.md。
+  3. 运行 ./.factory/scripts/doctor.sh 和 ./.factory/scripts/gates.sh。
   4. 运行 ./.factory/scripts/bootstrap-github.sh --apply。
-  5. 提交并推送，在 GitHub 保护默认分支，禁止 Agent 绕过或直接合并。
-  6. 用一个真实普通 Issue 完成首次 Draft/Ready 校准。
+  5. 提交并推送，在 GitHub 保护默认分支并要求人工合并 PR。
+  6. 用一个真实 Issue 完成首次 Spec、Draft/Ready、实现和验证校准。
 
-详细说明见 GETTING_STARTED.md（框架仓库）和 docs/factory/README.md（目标项目）。
+详细说明见框架仓库 README.md 和目标项目 docs/factory/CONTRACT.md。
 EOF
 
 echo

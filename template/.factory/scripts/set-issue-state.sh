@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Set exactly one Factory workflow-state label on an Issue in one GitHub update.
-# Non-state labels, including Pattern labels, are preserved.
+# Set exactly one Factory workflow-state label on an Issue.
 
 set -euo pipefail
 
@@ -8,7 +7,7 @@ ISSUE="${1:-}"
 REQUESTED_STATE="${2:-}"
 
 if ! [[ "$ISSUE" =~ ^[1-9][0-9]*$ ]] || [ -z "$REQUESTED_STATE" ]; then
-  echo "usage: $0 <issue-number> <ready-to-spec|wait-to-implement|ready-to-implement|needs-info|in-progress|awaiting-review>" >&2
+  echo "usage: $0 <issue-number> <spec|awaiting-spec-review|implementing|verifying|awaiting-merge|needs-info>" >&2
   exit 2
 fi
 
@@ -17,14 +16,22 @@ case "$REQUESTED_STATE" in
   *) TARGET_STATE="factory:$REQUESTED_STATE" ;;
 esac
 
-is_issue_state() {
+is_target_state() {
   case "$1" in
-    factory:ready-to-spec|factory:wait-to-implement|factory:ready-to-implement|factory:needs-info|factory:in-progress|factory:awaiting-review) return 0 ;;
+    factory:spec|factory:awaiting-spec-review|factory:implementing|factory:verifying|factory:awaiting-merge|factory:needs-info) return 0 ;;
     *) return 1 ;;
   esac
 }
 
-if ! is_issue_state "$TARGET_STATE"; then
+is_factory_state() {
+  if is_target_state "$1"; then return 0; fi
+  case "$1" in
+    factory:ready-to-spec|factory:wait-to-implement|factory:ready-to-implement|factory:in-progress|factory:awaiting-review) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if ! is_target_state "$TARGET_STATE"; then
   echo "FACTORY_STATE: issue=$ISSUE status=MISCONFIGURED reason=invalid-state state=$TARGET_STATE" >&2
   exit 2
 fi
@@ -47,7 +54,7 @@ preserved_labels=()
 previous_states=()
 while IFS= read -r label; do
   [ -n "$label" ] || continue
-  if is_issue_state "$label"; then
+  if is_factory_state "$label"; then
     previous_states+=("$label")
   else
     preserved_labels+=("$label")

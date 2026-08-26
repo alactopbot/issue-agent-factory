@@ -8,26 +8,19 @@ git -C "$fixture" init -q
 "$ROOT/install.sh" "$fixture" >/dev/null
 
 set +e
-(cd "$fixture" && ./.factory/scripts/doctor.sh >/dev/null); incomplete_status=$?
+(cd "$fixture" && ./.factory/scripts/doctor.sh >/dev/null)
+incomplete_status=$?
 set -e
 [ "$incomplete_status" -ne 0 ]
 
-sed -i.bak \
-  -e 's/<PROJECT_NAME>/Test project/g' \
-  -e 's/<INSTALL_COMMAND>/true/g' \
-  -e 's/<TEST_COMMAND>/true/g' \
-  -e 's/<BUILD_COMMAND>/true/g' \
-  -e 's/<RUN_COMMAND>/true/g' "$fixture/AGENTS.md"
-sed -i.bak \
-  -e 's/CHARTER_STATUS: incomplete/CHARTER_STATUS: ready/' \
-  -e 's/TIER: <revival | greenfield | oss | client-production>/TIER: greenfield/' "$fixture/docs/factory/CHARTER.md"
-rm -f "$fixture"/*.bak "$fixture/.factory"/*.bak "$fixture/docs/factory"/*.bak
-(cd "$fixture" && ./.factory/scripts/doctor.sh >/dev/null)
+git -C "$fixture" remote add origin https://example.invalid/project.git
+printf '%s\n' 'VERIFY_COMMAND="true"' > "$fixture/.factory/gates.conf"
+mkdir -p "$fixture/bin"
+printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = auth ] && [ "${2:-}" = status ]; then exit 0; fi' \
+  'exit 1' > "$fixture/bin/gh"
+chmod +x "$fixture/bin/gh"
 
-sed -i.bak -e 's/default: full/default: typo/' "$fixture/docs/factory/CHARTER.md"
-rm -f "$fixture/docs/factory/CHARTER.md.bak"
-set +e
-(cd "$fixture" && ./.factory/scripts/doctor.sh >/dev/null); invalid_gate_status=$?
-set -e
-[ "$invalid_gate_status" -ne 0 ]
+(cd "$fixture" && PATH="$fixture/bin:$PATH" ./.factory/scripts/doctor.sh >/dev/null)
 echo "doctor: ok"

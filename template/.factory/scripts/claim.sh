@@ -32,18 +32,8 @@ git remote get-url origin >/dev/null 2>&1 || {
 
 git fetch --quiet origin
 BRANCH="issue/$ISSUE"
-# Recognize both the stable name and legacy title-suffixed names so an updated
-# installation never creates a second claim for work already in progress.
-EXISTING_BRANCHES="$(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/issue/ | \
-  awk -v exact="$BRANCH" 'index($0, exact "-") == 1 || $0 == exact')"
-existing_count="$(printf '%s\n' "$EXISTING_BRANCHES" | awk 'NF { count += 1 } END { print count + 0 }')"
-if [ "$existing_count" -gt 1 ]; then
-  echo "FACTORY_CLAIM: status=MISCONFIGURED reason=multiple-issue-branches issue=$ISSUE" >&2
-  exit 2
-fi
-if [ "$existing_count" -eq 1 ]; then
-  existing_branch="$(printf '%s\n' "$EXISTING_BRANCHES" | sed -n '1p')"
-  echo "FACTORY_CLAIM: status=EXISTS branch=$existing_branch"
+if git rev-parse --verify "refs/remotes/origin/$BRANCH^{commit}" >/dev/null 2>&1; then
+  echo "FACTORY_CLAIM: status=EXISTS branch=$BRANCH"
   exit 3
 fi
 
